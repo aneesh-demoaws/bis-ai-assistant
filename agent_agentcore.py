@@ -1,4 +1,5 @@
 import boto3
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from strands import Agent, tool
 from strands.models import BedrockModel
 
@@ -45,17 +46,19 @@ bedrock_model = BedrockModel(
     region_name=REGION
 )
 
-def get_response(user_message: str) -> dict:
-    """Process user message and return response with metadata."""
+app = BedrockAgentCoreApp()
+
+@app.entrypoint
+def invoke(payload):
+    """Process user input and return a response"""
+    user_message = payload.get("prompt", "Hello")
     agent = Agent(
         model=bedrock_model,
         system_prompt=SYSTEM_PROMPT,
         tools=[search_newsletter]
     )
     result = agent(user_message)
-    return {
-        "answer": str(result),
-        "model": "Amazon Nova Lite 2",
-        "knowledge_base": KNOWLEDGE_BASE_ID,
-        "region": REGION
-    }
+    return {"answer": str(result), "model": "Amazon Nova Lite 2", "knowledge_base": KNOWLEDGE_BASE_ID}
+
+if __name__ == "__main__":
+    app.run()
