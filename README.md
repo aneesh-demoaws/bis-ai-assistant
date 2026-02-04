@@ -1,135 +1,126 @@
-# BIS AI Newsletter Assistant 🎓
+# BIS AI Assistant 🎓
 
-An educational AI-powered chatbot for Bhavans Indian School (BIS) Bahrain that answers questions about school newsletters using **Generative AI** and **RAG (Retrieval-Augmented Generation)**.
-
-## 🌟 Features
-
-- **AI-Powered Q&A**: Ask questions about the school newsletter and get instant answers
-- **Educational Interface**: Learn how RAG and Generative AI work behind the scenes
-- **Real-time Pipeline Visualization**: See each step of the AI process as it happens
-- **Student-Friendly Design**: Clean, modern interface designed for students to experiment
-- **Future Voice Support**: Ready for Amazon Nova Sonic voice-to-voice integration
+An educational AI-powered assistant for Bhavans Indian School (BIS) Bahrain featuring:
+- **Text Chat**: RAG-powered Q&A using Amazon Bedrock Knowledge Base
+- **Voice Chat**: Real-time voice-to-voice using Amazon Nova 2 Sonic
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Web Browser (User)                        │
-│  ┌─────────────────────┐  ┌───────────────────────────────┐ │
-│  │    Chat Interface   │  │   "How It Works" Panel        │ │
-│  │  - Ask questions    │  │   - RAG pipeline steps        │ │
-│  │  - View responses   │  │   - Model info                │ │
-│  └─────────────────────┘  └───────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-                              │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              User Browser                                    │
+│  ┌──────────────────────┐              ┌──────────────────────┐             │
+│  │   Text Chat (/)      │              │  Voice Chat (/voice) │             │
+│  │   - Type questions   │              │  - Speak questions   │             │
+│  │   - See RAG pipeline │              │  - Hear responses    │             │
+│  └──────────┬───────────┘              └──────────┬───────────┘             │
+└─────────────┼──────────────────────────────────────┼────────────────────────┘
+              │ HTTPS                                │ WSS (WebSocket)
+              ▼                                      ▼
+┌─────────────────────────────┐    ┌─────────────────────────────────────────┐
+│   CloudFront + S3           │    │   ALB (bisai-alb.demoaws.com)           │
+│   bisai.demoaws.com         │    │   HTTPS → EC2:8080                      │
+└─────────────┬───────────────┘    └──────────────────┬──────────────────────┘
+              │                                       │
+              ▼                                       ▼
+┌─────────────────────────────┐    ┌─────────────────────────────────────────┐
+│   API Gateway + Lambda      │    │   EC2 (Amazon Linux 2023)               │
+│   /chat endpoint            │    │   voice_server.py                       │
+│   Strands Agent             │    │   - BidiAgent + Nova 2 Sonic            │
+│   + Nova Lite               │    │   - WebSocket audio streaming           │
+└─────────────┬───────────────┘    │   - Interruption support                │
+              │                    └──────────────────┬──────────────────────┘
+              │                                       │
+              └───────────────┬───────────────────────┘
                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│              FastAPI Backend + Strands Agent                 │
-│         Amazon Nova Lite 2 + Bedrock Knowledge Base          │
-└─────────────────────────────────────────────────────────────┘
+              ┌───────────────────────────────────────┐
+              │   Amazon Bedrock Knowledge Base       │
+              │   ID: MNAX9DFME0 (eu-west-1)          │
+              │   - School newsletters                │
+              │   - OpenSearch vector store           │
+              └───────────────────────────────────────┘
 ```
 
 ## 🛠️ Technology Stack
 
-| Component | Technology |
-|-----------|------------|
-| **LLM Model** | Amazon Nova Lite 2 |
-| **Agent Framework** | Strands Agents SDK |
-| **Knowledge Base** | Amazon Bedrock Knowledge Base |
-| **Vector Store** | Amazon OpenSearch |
-| **Backend** | FastAPI + Python |
-| **Frontend** | HTML/CSS/JavaScript |
-| **Hosting** | Amazon Linux 2023 |
+| Component | Technology | Region |
+|-----------|------------|--------|
+| **Text LLM** | Amazon Nova Lite | eu-west-1 |
+| **Voice LLM** | Amazon Nova 2 Sonic | eu-north-1 |
+| **Agent Framework** | Strands Agents SDK | - |
+| **Voice Streaming** | BidiAgent (bidirectional) | - |
+| **Knowledge Base** | Amazon Bedrock KB | eu-west-1 |
+| **Vector Store** | Amazon OpenSearch | eu-west-1 |
+| **Text Backend** | Lambda + API Gateway | eu-west-1 |
+| **Voice Backend** | EC2 + ALB | eu-west-1 |
+| **Frontend** | CloudFront + S3 | Global |
+
+## 🎤 Voice Features (Nova 2 Sonic)
+
+- **Bidirectional Streaming**: Continuous audio flow in both directions
+- **Barge-in/Interruption**: Speak anytime to interrupt the assistant
+- **Voice Activity Detection**: Automatic speech detection
+- **Real-time Transcripts**: See what you say and hear
+- **Low Latency**: Optimized for natural conversation
 
 ## 📋 Prerequisites
 
-- Python 3.9+
+- Python 3.12+ (required for Nova Sonic)
 - AWS Account with Bedrock access
 - Amazon Bedrock Knowledge Base configured
-- AWS credentials configured
+- PyAudio dependencies (portaudio)
 
 ## 🚀 Quick Start
 
-### 1. Clone the repository
+### Text Chat (Lambda)
 ```bash
-git clone https://github.com/aneesh-demoaws/bis-ai-assistant.git
-cd bis-ai-assistant
+# Deploy via SAM or manually configure Lambda
+pip install strands-agents boto3
 ```
 
-### 2. Install dependencies
+### Voice Chat (EC2)
 ```bash
-pip install -r requirements.txt
-```
+# Install dependencies
+pip install 'strands-agents[bidi]' fastapi uvicorn boto3
 
-### 3. Configure environment
-```bash
-export AWS_REGION=eu-west-1
-export STRANDS_KNOWLEDGE_BASE_ID=YOUR_KB_ID
+# Run server
+python voice_server.py
 ```
-
-### 4. Run the application
-```bash
-python -m uvicorn app:app --host 0.0.0.0 --port 8080
-```
-
-### 5. Open in browser
-Navigate to `http://localhost:8080`
 
 ## 📁 Project Structure
 
 ```
 bis-ai-assistant/
-├── app.py              # FastAPI backend server
-├── agent.py            # Strands Agent with RAG
-├── requirements.txt    # Python dependencies
-├── start.sh           # Startup script
-├── bis-assistant.service  # Systemd service file
+├── app.py                 # Text chat FastAPI server
+├── agent.py               # Text chat Strands Agent
+├── voice_server.py        # Voice chat with BidiAgent
+├── requirements.txt       # Text chat dependencies
+├── requirements-voice.txt # Voice chat dependencies
+├── bis-assistant.service  # Text chat systemd service
+├── bis-voice.service      # Voice chat systemd service
 ├── static/
-│   └── index.html     # Educational web interface
+│   ├── index.html        # Text chat interface
+│   └── voice.html        # Voice chat interface
 └── README.md
 ```
 
+## 🌐 Live URLs
+
+| Interface | URL |
+|-----------|-----|
+| Text Chat | https://bisai.demoaws.com/ |
+| Voice Chat | https://bisai.demoaws.com/voice.html |
+| Voice API | wss://bisai-alb.demoaws.com/voice |
+
 ## 🎓 Learning Objectives
 
-This project helps students understand:
+This project demonstrates:
 
-1. **RAG (Retrieval-Augmented Generation)**: How AI searches documents before answering
-2. **Large Language Models (LLMs)**: AI trained to understand and generate text
-3. **Vector Search**: Finding similar content by meaning, not just keywords
-4. **Knowledge Bases**: Indexed documents the AI can search and reference
-5. **API Development**: How frontend and backend communicate
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AWS_REGION` | AWS region for Bedrock | `eu-west-1` |
-| `STRANDS_KNOWLEDGE_BASE_ID` | Bedrock KB ID | Required |
-
-### Systemd Service (Production)
-
-```bash
-# Copy service file
-sudo cp bis-assistant.service /etc/systemd/system/
-
-# Enable and start
-sudo systemctl daemon-reload
-sudo systemctl enable bis-assistant
-sudo systemctl start bis-assistant
-
-# Check status
-sudo systemctl status bis-assistant
-```
-
-## 🎤 Future: Voice Support
-
-The interface includes a microphone button placeholder for future integration with **Amazon Nova Sonic** for voice-to-voice conversations.
-
-## 📝 License
-
-This project is for educational purposes at Bhavans Indian School Bahrain.
+1. **RAG (Retrieval-Augmented Generation)**: Grounding AI responses in documents
+2. **Voice-to-Voice AI**: Real-time speech conversation with LLMs
+3. **Bidirectional Streaming**: WebSocket audio streaming patterns
+4. **Interruption Handling**: Natural conversation flow with barge-in
+5. **Multi-region Architecture**: Optimizing for service availability
 
 ## 👨‍🎓 Author
 
@@ -138,4 +129,4 @@ Student, Bhavans Indian School (BIS) Bahrain
 
 ---
 
-*Built with ❤️ using Amazon Bedrock, Strands Agents SDK, and FastAPI*
+*Built with ❤️ using Amazon Bedrock, Nova 2 Sonic, Strands Agents SDK*

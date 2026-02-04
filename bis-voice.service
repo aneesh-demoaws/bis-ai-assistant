@@ -1,0 +1,16 @@
+[Unit]
+Description=BIS Voice AI Assistant
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/bis-ai-assistant
+Environment="PATH=/home/ec2-user/bis-ai-assistant/venv/bin:/usr/local/bin:/usr/bin"
+Environment="LD_LIBRARY_PATH=/usr/local/lib"
+ExecStart=/home/ec2-user/bis-ai-assistant/venv/bin/python voice_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
