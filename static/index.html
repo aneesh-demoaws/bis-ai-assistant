@@ -2,41 +2,48 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BIS AI Newsletter Assistant</title>
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;color:#fff}
         .container{max-width:1200px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 350px;gap:20px;min-height:100vh}
-        @media(max-width:900px){.container{grid-template-columns:1fr}}
+        @media(max-width:900px){.container{grid-template-columns:1fr;padding:10px;gap:10px}.info-panel{order:2}.chat-panel{height:60vh}}
+        @media(max-width:500px){.header h1{font-size:1.3em}.header p{font-size:.8em}.message{max-width:95%;font-size:.95em}.input-area{padding:10px}.input-area input{padding:10px;font-size:.95em}.input-area button{padding:10px 15px}.card{padding:15px}.card h3{font-size:.9em}.suggestion{padding:8px;font-size:.85em}.model-info{font-size:.8em}.glossary-def{font-size:.8em}.step{font-size:.9em}}
         .header{grid-column:1/-1;text-align:center;padding:20px;background:rgba(255,255,255,0.1);border-radius:15px}
         .header h1{color:#00d4ff;font-size:1.8em}
         .header p{color:#aaa;margin-top:5px}
         .chat-panel{background:rgba(255,255,255,0.05);border-radius:15px;display:flex;flex-direction:column;height:70vh}
-        .messages{flex:1;overflow-y:auto;padding:20px}
-        .message{margin:10px 0;padding:12px 16px;border-radius:12px;max-width:85%;animation:fadeIn .3s}
+        .messages{flex:1;overflow-y:auto;padding:20px;-webkit-overflow-scrolling:touch}
+        .message{margin:10px 0;padding:12px 16px;border-radius:12px;max-width:85%;animation:fadeIn .3s;word-wrap:break-word}
         @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
         .user{background:#0066cc;margin-left:auto}
         .assistant{background:rgba(255,255,255,0.1)}
         .input-area{padding:15px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:10px}
-        .input-area input{flex:1;padding:12px;border:none;border-radius:25px;background:rgba(255,255,255,0.1);color:#fff;font-size:1em}
+        .input-area input{flex:1;padding:12px;border:none;border-radius:25px;background:rgba(255,255,255,0.1);color:#fff;font-size:1em;-webkit-appearance:none}
         .input-area input::placeholder{color:#888}
-        .input-area button{padding:12px 20px;border:none;border-radius:25px;cursor:pointer;font-size:1em}
+        .input-area button{padding:12px 20px;border:none;border-radius:25px;cursor:pointer;font-size:1em;touch-action:manipulation;transition:all .2s}
         .send-btn{background:#00d4ff;color:#000}
-        .send-btn:hover{background:#00b8e6}
-        .mic-btn{background:rgba(255,255,255,0.1);color:#888}
+        .send-btn:hover,.send-btn:active{background:#00b8e6}
+        .mic-btn{background:rgba(255,255,255,0.1);color:#fff;font-size:1.2em}
+        .mic-btn:hover{background:rgba(255,255,255,0.2)}
+        .mic-btn.recording{background:#ff4444;animation:pulse 1s infinite}
+        .mic-btn.playing{background:#00ff88;color:#000}
+        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
         .info-panel{display:flex;flex-direction:column;gap:15px}
+        @media(max-width:900px){.info-panel{display:grid;grid-template-columns:1fr 1fr;gap:10px}.info-panel .card:first-child{grid-column:1/-1}}
+        @media(max-width:500px){.info-panel{grid-template-columns:1fr}}
         .card{background:rgba(255,255,255,0.05);border-radius:15px;padding:20px}
         .card h3{color:#00d4ff;margin-bottom:15px;font-size:1em}
         .step{display:flex;align-items:center;gap:10px;padding:8px 0;color:#888}
         .step.active{color:#00d4ff}
         .step.done{color:#00ff88}
-        .step-num{width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:.8em}
+        .step-num{width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:.8em;flex-shrink:0}
         .step.active .step-num{background:#00d4ff;color:#000}
         .step.done .step-num{background:#00ff88;color:#000}
         .suggestions{display:flex;flex-direction:column;gap:8px}
-        .suggestion{background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);padding:10px;border-radius:8px;cursor:pointer;font-size:.9em;transition:all .2s}
-        .suggestion:hover{background:rgba(0,212,255,0.2)}
+        .suggestion{background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);padding:10px;border-radius:8px;cursor:pointer;font-size:.9em;transition:all .2s;-webkit-tap-highlight-color:transparent}
+        .suggestion:hover,.suggestion:active{background:rgba(0,212,255,0.2)}
         .model-info{font-size:.9em}
         .model-info div{padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1)}
         .model-info span{color:#00d4ff}
@@ -45,27 +52,30 @@
         .glossary-def{color:#aaa;font-size:.9em}
         .loading::after{content:'...';animation:dots 1s infinite}
         @keyframes dots{0%,20%{content:'.'}40%{content:'..'}60%,100%{content:'...'}}
+        .voice-status{text-align:center;padding:5px;font-size:.8em;color:#888}
+        .voice-status.active{color:#00d4ff}
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
         <h1>🎓 BIS AI Newsletter Assistant</h1>
-        <p>Bhavans Indian School Bahrain • Powered by Amazon Bedrock & Generative AI</p>
+        <p>Bhavans Indian School Bahrain • Powered by Amazon Bedrock & Nova Sonic</p>
     </div>
     <div class="chat-panel">
         <div class="messages" id="messages">
-            <div class="message assistant">👋 Hello! I'm your AI assistant for the BIS Newsletter (December 2025). Ask me anything about school events, achievements, or announcements!</div>
+            <div class="message assistant">👋 Hello! I'm your AI assistant for the BIS Newsletter. You can type or tap the microphone to speak!</div>
         </div>
+        <div class="voice-status" id="voiceStatus">🎤 Tap microphone to speak</div>
         <div class="input-area">
             <input type="text" id="userInput" placeholder="Ask about the newsletter..." onkeypress="if(event.key==='Enter')sendMessage()">
             <button class="send-btn" onclick="sendMessage()">Send</button>
-            <button class="mic-btn" disabled title="Voice coming soon with Nova Sonic">🎤</button>
+            <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
         </div>
     </div>
     <div class="info-panel">
         <div class="card">
-            <h3>🔄 How RAG Works</h3>
+            <h3>🔄 How It Works</h3>
             <div class="step" id="step1"><div class="step-num">1</div>Your question received</div>
             <div class="step" id="step2"><div class="step-num">2</div>Searching Knowledge Base</div>
             <div class="step" id="step3"><div class="step-num">3</div>AI generating response</div>
@@ -76,31 +86,39 @@
             <div class="suggestions">
                 <div class="suggestion" onclick="askQuestion(this.innerText)">What events happened in December?</div>
                 <div class="suggestion" onclick="askQuestion(this.innerText)">Tell me about student achievements</div>
-                <div class="suggestion" onclick="askQuestion(this.innerText)">What are the upcoming activities?</div>
+                <div class="suggestion" onclick="askQuestion(this.innerText)">Who won the Hindi mono acting?</div>
             </div>
         </div>
         <div class="card">
             <h3>🤖 Model Info</h3>
             <div class="model-info">
-                <div>Model: <span>Amazon Nova Lite 2</span></div>
-                <div>Architecture: <span>RAG (Retrieval-Augmented Generation)</span></div>
-                <div>Knowledge Base: <span>BIS Newsletter Dec 2025</span></div>
-                <div>Region: <span>eu-west-1</span></div>
+                <div>Text Model: <span>Amazon Nova Lite</span></div>
+                <div>Voice Model: <span>Amazon Nova Sonic</span></div>
+                <div>Speech: <span>Amazon Polly Neural</span></div>
+                <div>Knowledge Base: <span>BIS Newsletter</span></div>
             </div>
         </div>
         <div class="card">
             <h3>📚 AI Glossary</h3>
             <div class="glossary-item"><span class="glossary-term">RAG</span><div class="glossary-def">Retrieval-Augmented Generation - AI searches documents before answering</div></div>
-            <div class="glossary-item"><span class="glossary-term">LLM</span><div class="glossary-def">Large Language Model - AI trained to understand and generate text</div></div>
-            <div class="glossary-item"><span class="glossary-term">Vector Search</span><div class="glossary-def">Finding similar content by meaning, not just keywords</div></div>
-            <div class="glossary-item"><span class="glossary-term">Knowledge Base</span><div class="glossary-def">Indexed documents the AI can search and reference</div></div>
+            <div class="glossary-item"><span class="glossary-term">Nova Sonic</span><div class="glossary-def">Amazon's voice AI for real-time speech conversations</div></div>
+            <div class="glossary-item"><span class="glossary-term">TTS</span><div class="glossary-def">Text-to-Speech - Converting text responses to audio</div></div>
         </div>
     </div>
 </div>
 <script>
+const API_URL = 'https://amfggbg1k5.execute-api.eu-west-1.amazonaws.com/chat';
+let isRecording = false;
+
 function resetSteps(){for(let i=1;i<=4;i++)document.getElementById('step'+i).className='step'}
 function setStep(n,s){document.getElementById('step'+n).className='step '+s}
 function askQuestion(q){document.getElementById('userInput').value=q;sendMessage()}
+function setVoiceStatus(text, active=false){
+    const el = document.getElementById('voiceStatus');
+    el.textContent = text;
+    el.className = 'voice-status' + (active ? ' active' : '');
+}
+
 async function sendMessage(){
     const input=document.getElementById('userInput'),msg=input.value.trim();
     if(!msg)return;
@@ -111,18 +129,87 @@ async function sendMessage(){
     messages.innerHTML+=`<div class="message assistant" id="loading"><span class="loading">Thinking</span></div>`;
     messages.scrollTop=messages.scrollHeight;
     try{
-        const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+        const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
         setStep(2,'done');setStep(3,'active');
         const data=await res.json();
         setStep(3,'done');setStep(4,'done');
         document.getElementById('loading').remove();
-        messages.innerHTML+=`<div class="message assistant">${data.answer}</div>`;
+        const answer = data.answer.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+        messages.innerHTML+=`<div class="message assistant">${answer}</div>`;
+        speakText(answer);
     }catch(e){
         document.getElementById('loading').remove();
         messages.innerHTML+=`<div class="message assistant">Sorry, something went wrong. Please try again.</div>`;
         resetSteps();
     }
     messages.scrollTop=messages.scrollHeight;
+}
+
+async function toggleVoice(){
+    const micBtn = document.getElementById('micBtn');
+    
+    if(!isRecording){
+        if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.continuous = false;
+            
+            recognition.onstart = () => {
+                isRecording = true;
+                micBtn.classList.add('recording');
+                setVoiceStatus('🔴 Listening... Speak now', true);
+            };
+            
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('userInput').value = transcript;
+                sendMessage();
+            };
+            
+            recognition.onend = () => {
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                setVoiceStatus('🎤 Tap microphone to speak');
+            };
+            
+            recognition.onerror = (e) => {
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                if(e.error === 'not-allowed'){
+                    setVoiceStatus('❌ Microphone access denied');
+                }else{
+                    setVoiceStatus('❌ Error: ' + e.error);
+                }
+                setTimeout(() => setVoiceStatus('🎤 Tap microphone to speak'), 2000);
+            };
+            
+            recognition.start();
+        }else{
+            setVoiceStatus('❌ Speech recognition not supported in this browser');
+        }
+    }
+}
+
+function speakText(text){
+    if('speechSynthesis' in window){
+        const cleanText = text.replace(/\*\*/g, '').replace(/\n/g, '. ').substring(0, 500);
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        
+        const micBtn = document.getElementById('micBtn');
+        utterance.onstart = () => {
+            micBtn.classList.add('playing');
+            setVoiceStatus('🔊 Speaking...', true);
+        };
+        utterance.onend = () => {
+            micBtn.classList.remove('playing');
+            setVoiceStatus('🎤 Tap microphone to speak');
+        };
+        
+        speechSynthesis.speak(utterance);
+    }
 }
 </script>
 </body>
