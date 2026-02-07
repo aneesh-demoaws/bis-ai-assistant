@@ -1,14 +1,18 @@
 # BIS AI Assistant 🎓
 
-An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** featuring real-time voice conversations using Amazon Nova 2 Sonic and text-based Q&A with RAG.
+An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** featuring:
+- 🎤 Real-time voice conversations using Amazon Nova 2 Sonic
+- 🧑‍💼 3D animated avatar using Amazon Sumerian Host
+- 💬 Text-based Q&A with RAG
 
 ## 🌟 Live Demo
 
 | Interface | URL |
 |-----------|-----|
-| **Voice Chat** (default) | https://bisai.demoaws.com/ |
-| Text Chat | https://bisai.demoaws.com/text.html |
-| Voice WebSocket API | wss://bisai-alb.demoaws.com/voice |
+| **Voice Chat** (3D Avatar) | https://bisai.demoaws.com/ |
+| Voice Chat (Simple) | https://bisai.demoaws.com/voice1.html |
+| Text Chat | https://bisai.demoaws.com/index.html |
+| Admin Portal | https://bisai.demoaws.com/admin.html |
 
 ---
 
@@ -18,11 +22,12 @@ An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                 USER BROWSER                                     │
 │  ┌─────────────────────────────────┐    ┌─────────────────────────────────────┐ │
-│  │         VOICE CHAT (/)          │    │        TEXT CHAT (/text.html)       │ │
-│  │  • Microphone capture (16kHz)   │    │  • Type questions                   │ │
-│  │  • Real-time audio playback     │    │  • See RAG pipeline visualization   │ │
-│  │  • Interrupt anytime (barge-in) │    │  • View source documents            │ │
-│  │  • Live transcription           │    │                                     │ │
+│  │    VOICE CHAT (3D Avatar)       │    │        TEXT CHAT (/index.html)      │ │
+│  │  • Sumerian Host 3D character   │    │  • Type questions                   │ │
+│  │  • Audio-driven lip sync        │    │  • See RAG pipeline visualization   │ │
+│  │  • Gestures & body language     │    │  • View source documents            │ │
+│  │  • Real-time audio playback     │    │                                     │ │
+│  │  • Interrupt anytime (barge-in) │    │                                     │ │
 │  └───────────────┬─────────────────┘    └──────────────────┬──────────────────┘ │
 └──────────────────┼─────────────────────────────────────────┼────────────────────┘
                    │ WebSocket (WSS)                         │ HTTPS POST
@@ -31,8 +36,8 @@ An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** 
 │      APPLICATION LOAD BALANCER      │    │           CLOUDFRONT + S3           │
 │      bisai-alb.demoaws.com          │    │         bisai.demoaws.com           │
 │  • SSL termination (ACM cert)       │    │  • Static file hosting              │
-│  • Health checks on /health         │    │  • Global edge caching              │
-│  • Target: EC2:8080                 │    │  • Custom domain + SSL              │
+│  • Health checks on /health         │    │  • 3D assets (characters, anims)    │
+│  • Target: EC2:8080                 │    │  • Global edge caching              │
 └───────────────────┬─────────────────┘    └──────────────────┬──────────────────┘
                     │                                         │
                     ▼                                         ▼
@@ -40,26 +45,58 @@ An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** 
 │        EC2 INSTANCE (eu-west-1)     │    │     API GATEWAY + LAMBDA            │
 │        Amazon Linux 2023            │    │     /chat endpoint                  │
 │  ┌─────────────────────────────┐    │    │  ┌─────────────────────────────┐    │
-│  │      voice_server.py        │    │    │  │       agent.py              │    │
-│  │  • FastAPI + Uvicorn        │    │    │  │  • Strands Agent            │    │
-│  │  • BidiAgent (Strands SDK)  │    │    │  │  • Amazon Nova Lite         │    │
-│  │  • WebSocket /voice         │    │    │  │  • KB retrieve tool         │    │
-│  │  • Audio streaming (PCM)    │    │    │  └──────────────┬──────────────┘    │
+│  │      voice_server.py        │    │    │  │   Bedrock AgentCore         │    │
+│  │  • FastAPI + Uvicorn        │    │    │  │  • Amazon Nova Lite         │    │
+│  │  • BidiAgent (Strands SDK)  │    │    │  │  • KB retrieve tool         │    │
+│  │  • WebSocket /voice         │    │    │  └──────────────┬──────────────┘    │
 │  └──────────────┬──────────────┘    │    └─────────────────┼───────────────────┘
 └─────────────────┼───────────────────┘                      │
-                  │                                          │
                   │ Bedrock API                              │ Bedrock API
                   ▼                                          ▼
 ┌─────────────────────────────────────┐    ┌─────────────────────────────────────┐
 │     AMAZON NOVA 2 SONIC             │    │     AMAZON BEDROCK KNOWLEDGE BASE   │
 │     (eu-north-1)                    │    │     ID: MNAX9DFME0 (eu-west-1)      │
-│  • Model: amazon.nova-sonic-v1:0    │    │  • School newsletters indexed       │
+│  • Model: amazon.nova-2-sonic-v1:0  │    │  • School newsletters indexed       │
 │  • Bidirectional audio streaming    │    │  • OpenSearch Serverless vectors    │
-│  • Voice: "tiffany"                 │    │  • Semantic search (top 5 results)  │
-│  • Interruption detection           │    │  • Score threshold: 0.3             │
-│  • Temperature: 0.3                 │    │                                     │
+│  • Voice: "arjun"                   │    │  • Semantic search (top 10 results) │
+│  • max_tokens: 8192                 │    │  • Score threshold: 0.3             │
 └─────────────────────────────────────┘    └─────────────────────────────────────┘
 ```
+
+---
+
+## 🧑‍💼 3D Avatar (Amazon Sumerian Host)
+
+The voice assistant features a realistic 3D animated character powered by the open-source Amazon Sumerian Host SDK.
+
+### Features
+
+| Feature | Implementation |
+|---------|----------------|
+| **Lip Sync** | Audio-driven viseme animation using Web Audio API AnalyserNode |
+| **Gestures** | Random gestures during speech (every 3-7s) |
+| **Eye Tracking** | Point of Interest (POI) tracking toward camera |
+| **Blinking** | Natural random blink animation (~3s interval) |
+| **Idle Animation** | Face and body idle animations |
+| **Loading** | Parallel asset loading with progress indicator |
+
+### Available Characters
+
+| Character | Type | Status |
+|-----------|------|--------|
+| **Jay** | Adult Male | ✅ Active |
+| Luke | Adult Male | Available |
+| Preston | Adult Male | Available |
+| Wes | Adult Male | Available |
+| Alien | Alien | Available |
+
+### Technical Details
+
+- **SDK**: Amazon Sumerian Host (open source) + Three.js v0.127.0
+- **Viseme weights**: Amplified 2x for visible mouth movement
+- **Smoothing**: 40% lerp between viseme frames
+- **Gestures**: generic_a/b/c, big, one, many, self, you, in, movement
+- **Cache**: 7-day browser cache on all 3D assets
 
 ---
 
@@ -73,7 +110,7 @@ An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** 
 | Audio Format | PCM Int16, base64 encoded for WebSocket |
 | Playback | Scheduled `AudioBufferSource` for gapless audio |
 | Interruption | Clears audio queue on `interruption` event |
-| UI States | Recording (green), Speaking (blue), Idle (red) |
+| 3D Rendering | Three.js with Sumerian Host SDK |
 
 ### Backend (`voice_server.py`)
 
@@ -97,10 +134,10 @@ WebSocket               # FastAPI WebSocket for browser connection
 
 ```python
 BidiNovaSonicModel(
-    model_id="amazon.nova-sonic-v1:0",
+    model_id="amazon.nova-2-sonic-v1:0",
     provider_config={
-        "audio": {"voice": "tiffany"},
-        "inference": {"temperature": 0.3}  # Lower = more factual
+        "audio": {"voice": "arjun"},
+        "inference": {"max_tokens": 8192, "temperature": 0.7, "top_p": 0.9}
     },
     client_config={"region": "eu-north-1"}
 )
@@ -127,21 +164,23 @@ def search_school_info(query: str) -> str:
         knowledgeBaseId="MNAX9DFME0",
         retrievalQuery={"text": query},
         retrievalConfiguration={
-            "vectorSearchConfiguration": {"numberOfResults": 5}
+            "vectorSearchConfiguration": {"numberOfResults": 10}
         }
     )
     # Filter by relevance score > 0.3
-    # Return up to 800 chars per result
 ```
 
-### System Prompt Strategy
+### System Prompt
 
 ```
-1. ALWAYS use search_school_info FIRST before answering
-2. Base answers ONLY on tool results - no hallucination
-3. If no results, admit "I don't have that information"
-4. Quote specific details (dates, names, numbers)
-5. Keep responses concise (2-3 sentences)
+You are a friendly AI voice assistant for Bhavans Indian School (BIS) Bahrain.
+
+RULES:
+1. ALWAYS use search_school_info tool FIRST for school questions
+2. Base answers ONLY on search results - never make up information
+3. If no results, say "I don't have that information, please check with the school office"
+4. Keep responses concise but ALWAYS complete your sentences. Aim for 2-4 sentences.
+5. Be warm and helpful like a school receptionist
 ```
 
 ---
@@ -151,6 +190,7 @@ def search_school_info(query: str) -> str:
 | Layer | Component | Technology | Region |
 |-------|-----------|------------|--------|
 | **Frontend** | Static hosting | CloudFront + S3 | Global |
+| **Frontend** | 3D Avatar | Sumerian Host + Three.js | Browser |
 | **Frontend** | Voice UI | Web Audio API, WebSocket | Browser |
 | **Backend** | Voice server | FastAPI + Uvicorn | eu-west-1 |
 | **Backend** | Text API | Lambda + API Gateway | eu-west-1 |
@@ -160,8 +200,6 @@ def search_school_info(query: str) -> str:
 | **Data** | Knowledge base | Bedrock KB + OpenSearch | eu-west-1 |
 | **Infra** | Load balancer | Application Load Balancer | eu-west-1 |
 | **Infra** | Compute | EC2 (t3.small) | eu-west-1 |
-| **Infra** | DNS | Route 53 | Global |
-| **Infra** | SSL | AWS Certificate Manager | us-east-1, eu-west-1 |
 
 ---
 
@@ -177,59 +215,11 @@ bis-ai-assistant/
 ├── bis-assistant.service  # ⚙️ Text chat systemd service
 ├── bis-voice.service      # ⚙️ Voice chat systemd service
 ├── static/
-│   ├── index.html         # 🎤 Voice chat UI (default)
-│   └── text.html          # 💬 Text chat UI
+│   ├── voice.html         # 🎤 Voice chat UI with 3D avatar
+│   ├── index.html         # 💬 Text chat UI
+│   └── admin.html         # 🔧 Admin portal for KB management
 └── README.md              # 📖 This file
 ```
-
----
-
-## 🚀 Deployment Guide
-
-### Prerequisites
-
-- AWS Account with Bedrock access (Nova Lite, Nova Sonic)
-- Bedrock Knowledge Base configured
-- Python 3.12+ (required for Nova Sonic)
-- Domain with SSL certificates
-
-### Voice Server (EC2)
-
-```bash
-# 1. Launch EC2 (Amazon Linux 2023, t3.small+)
-# 2. Install dependencies
-sudo dnf install -y python3.12 python3.12-devel gcc make alsa-lib-devel
-
-# 3. Build PortAudio (required for PyAudio)
-wget http://files.portaudio.com/archives/pa_stable_v190700_20210406.tgz
-tar xzf pa_stable_v190700_20210406.tgz && cd portaudio
-./configure && make && sudo make install
-echo '/usr/local/lib' | sudo tee /etc/ld.so.conf.d/local.conf
-sudo ldconfig
-
-# 4. Setup Python environment
-python3.12 -m venv venv
-source venv/bin/activate
-pip install 'strands-agents[bidi]' fastapi uvicorn boto3
-
-# 5. Run server
-python voice_server.py
-
-# 6. Setup systemd service
-sudo cp bis-voice.service /etc/systemd/system/
-sudo systemctl enable --now bis-voice
-```
-
-### ALB Configuration
-
-| Setting | Value |
-|---------|-------|
-| Scheme | Internet-facing |
-| Listener | HTTPS:443 → Target Group |
-| Target | EC2 instance, port 8080 |
-| Health check | GET /health |
-| SSL Certificate | ACM (for custom domain) |
-| Stickiness | Enabled (WebSocket) |
 
 ---
 
@@ -241,11 +231,11 @@ This project demonstrates:
 |---------|----------------|
 | **RAG** | Knowledge Base retrieval before LLM generation |
 | **Voice AI** | Real-time speech-to-speech with Nova Sonic |
+| **3D Animation** | Sumerian Host with lip sync and gestures |
 | **Bidirectional Streaming** | WebSocket audio streaming patterns |
 | **Interruption Handling** | Barge-in detection and audio queue clearing |
 | **Agent Tools** | Function calling for grounded responses |
 | **Multi-region** | Optimizing for model availability |
-| **Serverless + Server** | Lambda for text, EC2 for stateful voice |
 
 ---
 
@@ -262,4 +252,4 @@ Educational project for Bhavans Indian School Bahrain.
 
 ---
 
-*Built with ❤️ using Amazon Bedrock, Nova 2 Sonic, and Strands Agents SDK*
+*Built with ❤️ using Amazon Bedrock, Nova 2 Sonic, Sumerian Host, and Strands Agents SDK*
