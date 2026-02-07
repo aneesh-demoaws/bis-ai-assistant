@@ -91,12 +91,9 @@ def handle_upload(event):
     try:
         body = json.loads(event.get("body", "{}"))
         filename = body["filename"]
-        content_b64 = body["content"]
-        content = base64.b64decode(content_b64)
-        s3.put_object(Bucket=S3_BUCKET, Key=filename, Body=content)
-        sync = bedrock.start_ingestion_job(knowledgeBaseId=KB_ID, dataSourceId=DS_ID)
-        job_id = sync["ingestionJob"]["ingestionJobId"]
-        return response(200, {"message": f"Uploaded {filename}", "ingestionJobId": job_id})
+        content_type = body.get("contentType", "application/octet-stream")
+        url = s3.generate_presigned_url("put_object", Params={"Bucket": S3_BUCKET, "Key": filename, "ContentType": content_type}, ExpiresIn=300)
+        return response(200, {"uploadUrl": url, "filename": filename})
     except Exception as e:
         return response(500, {"error": str(e)})
 
