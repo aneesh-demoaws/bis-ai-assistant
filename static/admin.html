@@ -111,18 +111,21 @@
             for (const file of files) {
                 progress.innerHTML = `<div class="alert alert-info">⏳ Uploading ${file.name}...</div>`;
                 try {
-                    const b64 = await fileToBase64(file);
-                    const res = await apiFetch('/admin/upload', { method: 'POST', body: JSON.stringify({ filename: file.name, content: b64 }) });
+                    const res = await apiFetch('/admin/upload', { method: 'POST', body: JSON.stringify({ filename: file.name, contentType: file.type || 'application/octet-stream' }) });
                     const data = await res.json();
-                    if (res.ok) { showAlert(`✅ Uploaded ${file.name} — KB sync started (Job: ${data.ingestionJobId})`, 'success'); pollSync(data.ingestionJobId); }
-                    else { showAlert(`❌ Failed: ${data.error}`, 'error'); }
+                    if (!res.ok) { showAlert(`❌ Failed: ${data.error}`, 'error'); continue; }
+                    const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+                    if (!putRes.ok) { showAlert(`❌ S3 upload failed for ${file.name}`, 'error'); continue; }
+                    const syncRes = await apiFetch('/admin/sync', { method: 'POST' });
+                    const syncData = await syncRes.json();
+                    if (syncRes.ok) { showAlert(`✅ Uploaded ${file.name} — KB sync started (Job: ${syncData.ingestionJobId})`, 'success'); pollSync(syncData.ingestionJobId); }
+                    else { showAlert(`✅ Uploaded ${file.name} but sync failed`, 'error'); }
                 } catch (e) { showAlert(`❌ Upload error: ${e.message}`, 'error'); }
             }
             progress.innerHTML = '';
             document.getElementById('fileInput').value = '';
             loadDocuments();
         }
-        function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = reject; reader.readAsDataURL(file); }); }
         async function loadDocuments() {
             try {
                 const res = await apiFetch('/admin/documents');
