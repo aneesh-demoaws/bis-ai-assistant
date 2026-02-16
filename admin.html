@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIS AI Admin Portal</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #fff; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        h1 { text-align: center; margin-bottom: 0.5rem; font-size: 1.8rem; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 2rem; }
+        .card { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card h2 { font-size: 1.2rem; margin-bottom: 1rem; color: #60a5fa; }
+        input, button { font-family: inherit; font-size: 0.95rem; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 0.7rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; margin-bottom: 0.8rem; }
+        button { padding: 0.7rem 1.5rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: linear-gradient(145deg, #e94560, #c73e54); color: #fff; }
+        .btn-primary:hover { transform: scale(1.02); }
+        .btn-danger { background: #dc2626; color: #fff; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-secondary { background: rgba(255,255,255,0.15); color: #fff; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.25); }
+        .upload-area { border: 2px dashed rgba(255,255,255,0.2); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .upload-area:hover, .upload-area.dragover { border-color: #e94560; background: rgba(233,69,96,0.1); }
+        .upload-area input { display: none; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        th { color: #888; font-size: 0.85rem; text-transform: uppercase; }
+        .status-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+        .status-COMPLETE { background: #166534; color: #4ade80; }
+        .status-IN_PROGRESS, .status-STARTING { background: #854d0e; color: #fbbf24; }
+        .status-FAILED { background: #991b1b; color: #fca5a5; }
+        .alert { padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 1rem; }
+        .alert-success { background: rgba(74,222,128,0.15); color: #4ade80; }
+        .alert-error { background: rgba(252,165,165,0.15); color: #fca5a5; }
+        .alert-info { background: rgba(96,165,250,0.15); color: #60a5fa; }
+        .hidden { display: none; }
+        .logout-bar { text-align: right; margin-bottom: 1rem; }
+        .file-size { color: #888; font-size: 0.85rem; }
+        .nav-link { text-align: center; margin-top: 1rem; }
+        .nav-link a { color: #60a5fa; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 BIS AI Admin Portal</h1>
+        <p class="subtitle">Knowledge Base Document Management</p>
+
+        <!-- Login -->
+        <div id="loginSection" class="card">
+            <h2>Admin Login</h2>
+            <div id="loginAlert"></div>
+            <input type="text" id="username" placeholder="Username" autocomplete="username">
+            <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+            <button class="btn-primary" onclick="login()">Login</button>
+        </div>
+
+        <!-- Admin Panel -->
+        <div id="adminPanel" class="hidden">
+            <div class="logout-bar">
+                <button class="btn-secondary" onclick="logout()">🚪 Logout</button>
+            </div>
+
+            <div id="alertArea"></div>
+
+            <!-- Upload -->
+            <div class="card">
+                <h2>📤 Upload Documents</h2>
+                <div class="upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <p>📁 Click or drag files here to upload</p>
+                    <p class="file-size">Supported: PDF, TXT, DOC, DOCX, CSV, HTML, MD</p>
+                    <input type="file" id="fileInput" multiple accept=".pdf,.txt,.doc,.docx,.csv,.html,.md">
+                </div>
+                <div id="uploadProgress"></div>
+            </div>
+
+            <!-- Documents -->
+            <div class="card">
+                <h2>📋 Documents in Knowledge Base</h2>
+                <button class="btn-secondary" onclick="loadDocuments()" style="margin-bottom:1rem">🔄 Refresh</button>
+                <div id="docList"><p style="color:#888">Loading...</p></div>
+            </div>
+
+            <!-- Sync Status -->
+            <div class="card">
+                <h2>🔄 Ingestion Sync Status</h2>
+                <button class="btn-secondary" onclick="loadSyncStatus()" style="margin-bottom:1rem">🔄 Refresh</button>
+                <div id="syncStatus"><p style="color:#888">Loading...</p></div>
+            </div>
+        </div>
+
+        <div class="nav-link"><a href="/">← Back to Voice Assistant</a></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://iyl4sjwpk7.execute-api.eu-west-1.amazonaws.com';
+        let token = sessionStorage.getItem('adminToken');
+
+        if (token) showAdmin();
+
+        document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+        // Drag and drop
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            try {
+                const res = await fetch(`${API_BASE}/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    token = data.token;
+                    sessionStorage.setItem('adminToken', token);
+                    showAdmin();
+                } else {
+                    document.getElementById('loginAlert').innerHTML = '<div class="alert alert-error">❌ ' + data.error + '</div>';
+                }
+            } catch (e) {
+                document.getElementById('loginAlert').innerHTML = '<div class="alert alert-error">❌ Connection failed</div>';
+            }
+        }
+
+        function logout() {
+            token = null;
+            sessionStorage.removeItem('adminToken');
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('adminPanel').classList.add('hidden');
+        }
+
+        function showAdmin() {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+            loadDocuments();
+            loadSyncStatus();
+        }
+
+        function showAlert(msg, type = 'info') {
+            document.getElementById('alertArea').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+            setTimeout(() => document.getElementById('alertArea').innerHTML = '', 5000);
+        }
+
+        async function apiFetch(path, opts = {}) {
+            const res = await fetch(`${API_BASE}${path}`, {
+                ...opts,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) }
+            });
+            if (res.status === 401) { logout(); throw new Error('Session expired'); }
+            return res;
+        }
+
+        async function handleFiles(files) {
+            const progress = document.getElementById('uploadProgress');
+            for (const file of files) {
+                progress.innerHTML = `<div class="alert alert-info">⏳ Uploading ${file.name}...</div>`;
+                try {
+                    const res = await apiFetch('/admin/upload', { method: 'POST', body: JSON.stringify({ filename: file.name, contentType: file.type || 'application/octet-stream' }) });
+                    const data = await res.json();
+                    if (!res.ok) { showAlert(`❌ Failed: ${data.error}`, 'error'); continue; }
+                    const putRes = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+                    if (!putRes.ok) { showAlert(`❌ S3 upload failed for ${file.name}`, 'error'); continue; }
+                    const syncRes = await apiFetch('/admin/sync', { method: 'POST' });
+                    const syncData = await syncRes.json();
+                    if (syncRes.ok) { showAlert(`✅ Uploaded ${file.name} — KB sync started (Job: ${syncData.ingestionJobId})`, 'success'); pollSync(syncData.ingestionJobId); }
+                    else { showAlert(`✅ Uploaded ${file.name} but sync failed`, 'error'); }
+                } catch (e) { showAlert(`❌ Upload error: ${e.message}`, 'error'); }
+            }
+            progress.innerHTML = '';
+            document.getElementById('fileInput').value = '';
+            loadDocuments();
+        }
+
+        async function loadDocuments() {
+            try {
+                const res = await apiFetch('/admin/documents');
+                const data = await res.json();
+                const el = document.getElementById('docList');
+                if (!data.files || data.files.length === 0) {
+                    el.innerHTML = '<p style="color:#888">No documents found</p>';
+                    return;
+                }
+                el.innerHTML = '<table><thead><tr><th>File</th><th>Size</th><th>Modified</th><th></th></tr></thead><tbody>' +
+                    data.files.map(f => `<tr>
+                        <td>${f.key}</td>
+                        <td class="file-size">${formatSize(f.size)}</td>
+                        <td class="file-size">${new Date(f.lastModified).toLocaleString()}</td>
+                        <td><button class="btn-danger" onclick="deleteDoc('${f.key}')">🗑️ Delete</button></td>
+                    </tr>`).join('') + '</tbody></table>';
+            } catch (e) {
+                document.getElementById('docList').innerHTML = '<p class="alert alert-error">Failed to load</p>';
+            }
+        }
+
+        async function deleteDoc(key) {
+            if (!confirm(`Delete "${key}" and re-sync knowledge base?`)) return;
+            try {
+                const res = await apiFetch('/admin/documents', {
+                    method: 'DELETE',
+                    body: JSON.stringify({ key })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showAlert(`✅ Deleted ${key} — KB sync started (Job: ${data.ingestionJobId})`, 'success');
+                    pollSync(data.ingestionJobId);
+                    loadDocuments();
+                } else {
+                    showAlert(`❌ ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showAlert(`❌ Delete error: ${e.message}`, 'error');
+            }
+        }
+
+        async function loadSyncStatus() {
+            try {
+                const res = await apiFetch('/admin/sync', { method: 'GET' });
+                const data = await res.json();
+                const el = document.getElementById('syncStatus');
+                if (!data.jobs || data.jobs.length === 0) {
+                    el.innerHTML = '<p style="color:#888">No sync jobs found</p>';
+                    return;
+                }
+                el.innerHTML = '<table><thead><tr><th>Job ID</th><th>Status</th><th>Started</th><th>Updated</th></tr></thead><tbody>' +
+                    data.jobs.map(j => `<tr>
+                        <td class="file-size">${j.ingestionJobId.substring(0, 12)}...</td>
+                        <td><span class="status-badge status-${j.status}">${j.status}</span></td>
+                        <td class="file-size">${j.startedAt ? new Date(j.startedAt).toLocaleString() : '-'}</td>
+                        <td class="file-size">${j.updatedAt ? new Date(j.updatedAt).toLocaleString() : '-'}</td>
+                    </tr>`).join('') + '</tbody></table>';
+            } catch (e) {
+                document.getElementById('syncStatus').innerHTML = '<p class="alert alert-error">Failed to load</p>';
+            }
+        }
+
+        function pollSync(jobId) {
+            const interval = setInterval(async () => {
+                await loadSyncStatus();
+                try {
+                    const res = await apiFetch('/admin/sync', { method: 'GET' });
+                    const data = await res.json();
+                    const job = data.jobs?.find(j => j.ingestionJobId === jobId);
+                    if (job && (job.status === 'COMPLETE' || job.status === 'FAILED')) {
+                        clearInterval(interval);
+                        if (job.status === 'COMPLETE') showAlert('✅ Knowledge base sync completed!', 'success');
+                        else showAlert('❌ Knowledge base sync failed', 'error');
+                    }
+                } catch (e) { clearInterval(interval); }
+            }, 5000);
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+    </script>
+</body>
+</html>

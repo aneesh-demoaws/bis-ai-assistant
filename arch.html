@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIS AI Assistant - How It Works</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.2em;
+        }
+        .diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            margin: 40px 0;
+            position: relative;
+        }
+        .diagram::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, 
+                transparent 0%, 
+                #667eea 10%, 
+                #667eea 90%, 
+                transparent 100%);
+            transform: translateX(-50%);
+            z-index: 0;
+        }
+        .layer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+        .box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            min-width: 200px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+            position: relative;
+            overflow: visible;
+        }
+        .box:hover {
+            transform: translateY(-5px);
+        }
+        .box::after {
+            content: '💫';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 1.5em;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+        .box-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        .box-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .box-desc {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .arrow {
+            font-size: 3em;
+            color: #667eea;
+            animation: bounce 2s infinite;
+            position: relative;
+        }
+        .arrow::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 40px;
+            background: linear-gradient(to bottom, transparent, #667eea);
+            animation: flowDown 1.5s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        @keyframes flowDown {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            50% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+        }
+        .data-flow-animation {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #00d4ff;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #00d4ff;
+            animation: dataFlow 3s infinite;
+            opacity: 0;
+        }
+        @keyframes dataFlow {
+            0% { opacity: 0; transform: translateY(0) scale(0.5); }
+            10% { opacity: 1; transform: translateY(50px) scale(1); }
+            90% { opacity: 1; transform: translateY(calc(100vh - 200px)) scale(1); }
+            100% { opacity: 0; transform: translateY(calc(100vh - 150px)) scale(0.5); }
+        }
+        .brain-box {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            flex: 1;
+            max-width: 500px;
+        }
+        .tools-box {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            flex: 1;
+            max-width: 500px;
+        }
+        .info-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+        }
+        .info-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        .concept {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 5px solid #667eea;
+        }
+        .concept h3 {
+            color: #764ba2;
+            margin-bottom: 10px;
+        }
+        .concept p {
+            color: #555;
+            line-height: 1.6;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        .tab {
+            padding: 15px 30px;
+            background: #e0e0e0;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.05);
+        }
+        .flow-content {
+            display: none;
+        }
+        .flow-content.active {
+            display: block;
+        }
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .step-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .step-desc {
+            color: #666;
+            line-height: 1.5;
+        }
+        .step-icon {
+            font-size: 2.5em;
+            flex-shrink: 0;
+        }
+        .data-packet {
+            background: #fff3cd;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 0.9em;
+            border-left: 4px solid #ffc107;
+        }
+        .flow-arrow {
+            text-align: center;
+            font-size: 2em;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
+            h1 { font-size: 1.8em; }
+            .box { min-width: 150px; padding: 20px; }
+            .box-icon { font-size: 2em; }
+            .flow-step { flex-direction: column; text-align: center; }
+            .tab { padding: 10px 20px; font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 BIS AI Assistant</h1>
+        <p class="subtitle">How Your Smart School Assistant Works</p>
+        <p style="text-align: center; color: #764ba2; font-size: 1.1em; margin-top: 10px; margin-bottom: 25px; font-weight: 600;">
+            💡 Project developed by Anirudh Nair, Grade 7 Jupiter
+        </p>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showFlow('overview')">📊 Overview</button>
+            <button class="tab" onclick="showFlow('text')">💬 Text Chat Flow</button>
+            <button class="tab" onclick="showFlow('voice')">🎤 Voice Chat Flow</button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview" class="flow-content active">
+
+        <div class="diagram">
+            <!-- Layer 1: User Interfaces -->
+            <div class="layer">
+                <div class="box">
+                    <div class="box-icon">💬</div>
+                    <div class="box-title">Text Chat</div>
+                    <div class="box-desc">Type your questions</div>
+                </div>
+                <div class="box">
+                    <div class="box-icon">🎤</div>
+                    <div class="box-title">Voice Chat</div>
+                    <div class="box-desc">Speak naturally</div>
+                </div>
+            </div>
+
+            <div class="arrow">
+                ↓
+                <div class="data-flow-animation" style="animation-delay: 0s;"></div>
+                <div class="data-flow-animation" style="animation-delay: 1s;"></div>
+                <div class="data-flow-animation" style="animation-delay: 2s;"></div>
+            </div>
+
+            <!-- Layer 2: AI Brain -->
+            <div class="layer">
+                <div class="box brain-box">
+                    <div class="box-icon">🧠</div>
+                    <div class="box-title">AI Brain (LLM)</div>
+                    <div class="box-desc">Large Language Model that understands and generates human-like responses</div>
+                </div>
+            </div>
+
+            <div class="arrow">
+                ↓
+                <div class="data-flow-animation" style="animation-delay: 0.5s;"></div>
+                <div class="data-flow-animation" style="animation-delay: 1.5s;"></div>
+                <div class="data-flow-animation" style="animation-delay: 2.5s;"></div>
+            </div>
+
+            <!-- Layer 3: Tools -->
+            <div class="layer">
+                <div class="box tools-box">
+                    <div class="box-icon">📚</div>
+                    <div class="box-title">School Knowledge Base</div>
+                    <div class="box-desc">Searches BIS newsletters, events, and school information</div>
+                </div>
+                <div class="box tools-box">
+                    <div class="box-icon">🌐</div>
+                    <div class="box-title">Web Search</div>
+                    <div class="box-desc">Finds current information from the internet</div>
+                </div>
+            </div>
+
+            <div class="arrow">
+                ↓
+                <div class="data-flow-animation" style="animation-delay: 0.3s;"></div>
+                <div class="data-flow-animation" style="animation-delay: 1.3s;"></div>
+                <div class="data-flow-animation" style="animation-delay: 2.3s;"></div>
+            </div>
+
+            <!-- Layer 4: Response -->
+            <div class="layer">
+                <div class="box">
+                    <div class="box-icon">✨</div>
+                    <div class="box-title">Smart Answer</div>
+                    <div class="box-desc">Accurate response based on real information</div>
+                </div>
+            </div>
+        </div>
+
+        </div>
+        <!-- End Overview Tab -->
+
+        <!-- Text Chat Flow Tab -->
+        <div id="text" class="flow-content">
+            <h2 style="color: #667eea; margin-bottom: 30px; text-align: center;">💬 Text Chat Data Flow</h2>
+            
+            <div class="flow-step">
+                <div class="step-number">1</div>
+                <div class="step-icon">⌨️</div>
+                <div class="step-content">
+                    <div class="step-title">You Type Your Question</div>
+                    <div class="step-desc">You type a question in the chat box and click "Send"</div>
+                    <div class="data-packet">📤 Data: "What events happened in December?"</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">2</div>
+                <div class="step-icon">🌐</div>
+                <div class="step-content">
+                    <div class="step-title">Message Travels to Cloud</div>
+                    <div class="step-desc">Your message is sent over the internet to the AI server in the cloud</div>
+                    <div class="data-packet">📡 HTTP Request → Cloud Server</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">3</div>
+                <div class="step-icon">🧠</div>
+                <div class="step-content">
+                    <div class="step-title">AI Brain Analyzes Question</div>
+                    <div class="step-desc">The LLM reads your question and decides: "Is this about BIS school or general knowledge?"</div>
+                    <div class="data-packet">🤔 Decision: School question → Use School Knowledge Base</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">4</div>
+                <div class="step-icon">🔍</div>
+                <div class="step-content">
+                    <div class="step-title">Search for Information (RAG)</div>
+                    <div class="step-desc">The AI searches the BIS newsletter database or the web to find relevant information</div>
+                    <div class="data-packet">📚 Found: "December events: Sports Day, Annual Function, Prize Distribution..."</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">5</div>
+                <div class="step-icon">✍️</div>
+                <div class="step-content">
+                    <div class="step-title">Generate Smart Answer</div>
+                    <div class="step-desc">The LLM reads the search results and writes a clear, helpful answer</div>
+                    <div class="data-packet">💡 Generated: "In December, BIS had Sports Day on the 5th, Annual Function on the 15th..."</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">6</div>
+                <div class="step-icon">📱</div>
+                <div class="step-content">
+                    <div class="step-title">Answer Appears on Your Screen</div>
+                    <div class="step-desc">The answer travels back through the internet and appears in your chat window</div>
+                    <div class="data-packet">📥 Response displayed in chat</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">7</div>
+                <div class="step-icon">🔊</div>
+                <div class="step-content">
+                    <div class="step-title">Text-to-Speech (Optional)</div>
+                    <div class="step-desc">If audio is enabled, your browser reads the answer out loud using text-to-speech</div>
+                    <div class="data-packet">🎵 Browser speaks the answer</div>
+                </div>
+            </div>
+
+            <div style="background: #e3f2fd; padding: 20px; border-radius: 10px; margin-top: 30px;">
+                <strong>⏱️ Total Time:</strong> Usually 2-4 seconds from question to answer!
+            </div>
+        </div>
+        <!-- End Text Chat Flow Tab -->
+
+        <!-- Voice Chat Flow Tab -->
+        <div id="voice" class="flow-content">
+            <h2 style="color: #667eea; margin-bottom: 30px; text-align: center;">🎤 Voice Chat Data Flow</h2>
+            
+            <div class="flow-step">
+                <div class="step-number">1</div>
+                <div class="step-icon">🎤</div>
+                <div class="step-content">
+                    <div class="step-title">You Hold the Mic Button</div>
+                    <div class="step-desc">Press and hold the microphone button and start speaking your question</div>
+                    <div class="data-packet">🎙️ Microphone activated</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">2</div>
+                <div class="step-icon">🌊</div>
+                <div class="step-content">
+                    <div class="step-title">Voice Captured as Audio Waves</div>
+                    <div class="step-desc">Your voice is captured by the microphone and converted into digital audio data</div>
+                    <div class="data-packet">🎵 Audio: Sound waves → Digital PCM16 format (16,000 samples/second)</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">3</div>
+                <div class="step-icon">📡</div>
+                <div class="step-content">
+                    <div class="step-title">Real-Time Streaming to Cloud</div>
+                    <div class="step-desc">Audio chunks are sent continuously through a WebSocket connection (like a phone call over the internet)</div>
+                    <div class="data-packet">⚡ WebSocket: Bidirectional streaming connection</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">4</div>
+                <div class="step-icon">👂</div>
+                <div class="step-content">
+                    <div class="step-title">Speech-to-Text Conversion</div>
+                    <div class="step-desc">AI listens to your voice and converts it into text in real-time</div>
+                    <div class="data-packet">🗣️ Audio → Text: "What events happened in December?"</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">5</div>
+                <div class="step-icon">🧠</div>
+                <div class="step-content">
+                    <div class="step-title">AI Brain Analyzes Question</div>
+                    <div class="step-desc">The LLM understands your question and decides which tool to use</div>
+                    <div class="data-packet">🤔 Decision: School question → Use School Knowledge Base</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">6</div>
+                <div class="step-icon">🔍</div>
+                <div class="step-content">
+                    <div class="step-title">Search for Information (RAG)</div>
+                    <div class="step-desc">Searches BIS newsletters or the web for relevant information</div>
+                    <div class="data-packet">📚 Found: December events data from school database</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">7</div>
+                <div class="step-icon">✍️</div>
+                <div class="step-content">
+                    <div class="step-title">Generate Answer + Voice</div>
+                    <div class="step-desc">AI creates the answer text AND converts it to natural-sounding speech simultaneously</div>
+                    <div class="data-packet">🎭 Text + Audio generation happening together</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">8</div>
+                <div class="step-icon">🔊</div>
+                <div class="step-content">
+                    <div class="step-title">Stream Audio Back to You</div>
+                    <div class="step-desc">Audio chunks are streamed back through the WebSocket as they're generated (you hear it almost instantly!)</div>
+                    <div class="data-packet">🎵 Audio streaming: You hear the answer while it's still being generated</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">↓</div>
+
+            <div class="flow-step">
+                <div class="step-number">9</div>
+                <div class="step-icon">👂</div>
+                <div class="step-content">
+                    <div class="step-title">You Hear the Answer</div>
+                    <div class="step-desc">Your device plays the audio response through speakers/headphones. Text also appears on screen!</div>
+                    <div class="data-packet">🔊 Audio playback + 💬 Text display</div>
+                </div>
+            </div>
+
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 10px; margin-top: 30px;">
+                <strong>⚡ Special Feature:</strong> Voice mode uses <strong>bidirectional streaming</strong> - this means audio flows both ways at the same time, like a real conversation! You can even interrupt the AI while it's speaking.
+                <br><br>
+                <strong>⏱️ Total Time:</strong> Usually 1-3 seconds from speaking to hearing the answer!
+            </div>
+        </div>
+        <!-- End Voice Chat Flow Tab -->
+
+        <div class="info-section">
+            <h2>🎓 Key Concepts Explained</h2>
+
+            <div class="concept">
+                <h3>🤖 What is Generative AI?</h3>
+                <p>
+                    Generative AI is like a super-smart assistant that can <span class="highlight">create new content</span> - 
+                    it can write text, have conversations, and answer questions just like a human would. 
+                    Think of it as a robot that learned by reading millions of books and can now help you with almost anything!
+                </p>
+            </div>
+
+            <div class="concept">
+                <h3>🧠 What is an LLM (Large Language Model)?</h3>
+                <p>
+                    An LLM is the "brain" of the AI assistant. It's a computer program trained on huge amounts of text 
+                    to <span class="highlight">understand and generate language</span>. Just like you learned to speak by 
+                    listening to people around you, the LLM learned by "reading" billions of sentences from books, websites, 
+                    and articles.
+                </p>
+            </div>
+
+            <div class="concept">
+                <h3>📚 What is RAG (Retrieval-Augmented Generation)?</h3>
+                <p>
+                    RAG is a smart technique that makes AI more accurate. Instead of just guessing answers, the AI first 
+                    <span class="highlight">searches for real information</span> from trusted sources (like your school's 
+                    newsletters), then uses that information to create an answer. It's like doing research before answering 
+                    a question in class - you get better, more accurate answers!
+                </p>
+            </div>
+
+            <div class="concept">
+                <h3>🎯 How Does BIS AI Assistant Use These?</h3>
+                <p>
+                    When you ask a question:
+                </p>
+                <ol style="margin-left: 20px; margin-top: 10px; line-height: 1.8;">
+                    <li>The <span class="highlight">LLM brain</span> understands what you're asking</li>
+                    <li>It decides whether to search the <span class="highlight">School Knowledge Base</span> or the <span class="highlight">Web</span></li>
+                    <li>Using <span class="highlight">RAG</span>, it retrieves real information from these sources</li>
+                    <li>The LLM combines this information to generate a helpful, accurate answer</li>
+                    <li>You get the answer through text or voice!</li>
+                </ol>
+            </div>
+
+            <div class="concept">
+                <h3>💡 Why Is This Cool?</h3>
+                <p>
+                    This AI assistant is special because it doesn't just make up answers - it actually <span class="highlight">looks up 
+                    real information</span> about BIS events, achievements, and activities. For general questions, it searches the 
+                    internet to give you current, accurate information. It's like having a smart librarian who knows everything 
+                    about your school and can also search the entire internet in seconds!
+                </p>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; color: white;">
+            <p style="font-size: 1.1em;">
+                🌟 <strong>Designed by Anirudh Nair, Grade 7 Jupiter</strong> 🌟
+            </p>
+            <p style="margin-top: 10px; opacity: 0.9;">
+                Making AI accessible and understandable for BIS students
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function showFlow(flowType) {
+            // Hide all flows
+            document.querySelectorAll('.flow-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            
+            // Show selected flow
+            document.getElementById(flowType).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
