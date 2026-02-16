@@ -1,6 +1,8 @@
 # BIS AI Assistant
 
-> Educational AI Assistant for Bhavans Indian School Bahrain 🎓
+> Educational AI Assistant for Bhavans Indian School Bahrain
+
+[![AWS](https://img.shields.io/badge/AWS-Powered-orange)](https://aws.amazon.com) 🎓
 
 An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** featuring:
 - 🎤 Real-time voice conversations using Amazon Nova 2 Sonic
