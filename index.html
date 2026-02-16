@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BIS AI Assistant</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;color:#fff}
+        .container{max-width:1200px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 350px;gap:20px;min-height:100vh}
+        @media(max-width:900px){.container{grid-template-columns:1fr;padding:10px;gap:10px}.info-panel{order:2}.chat-panel{height:60vh}}
+        @media(max-width:500px){.header h1{font-size:1.3em}.header p{font-size:.8em}.message{max-width:95%;font-size:.95em}.input-area{padding:10px}.input-area input{padding:10px;font-size:.95em}.input-area button{padding:10px 15px}.card{padding:15px}.card h3{font-size:.9em}.suggestion{padding:8px;font-size:.85em}.model-info{font-size:.8em}.glossary-def{font-size:.8em}.step{font-size:.9em}}
+        .header{grid-column:1/-1;text-align:center;padding:20px;background:rgba(255,255,255,0.1);border-radius:15px}
+        .header h1{color:#00d4ff;font-size:1.8em}
+        .header p{color:#aaa;margin-top:5px}
+        .chat-panel{background:rgba(255,255,255,0.05);border-radius:15px;display:flex;flex-direction:column;height:70vh}
+        .messages{flex:1;overflow-y:auto;padding:20px;-webkit-overflow-scrolling:touch}
+        .message{margin:10px 0;padding:12px 16px;border-radius:12px;max-width:85%;animation:fadeIn .3s;word-wrap:break-word}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        .user{background:#0066cc;margin-left:auto}
+        .assistant{background:rgba(255,255,255,0.1)}
+        .input-area{padding:15px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:10px}
+        .input-area input{flex:1;padding:12px;border:none;border-radius:25px;background:rgba(255,255,255,0.1);color:#fff;font-size:1em;-webkit-appearance:none}
+        .input-area input::placeholder{color:#888}
+        .input-area button{padding:12px 20px;border:none;border-radius:25px;cursor:pointer;font-size:1em;touch-action:manipulation;transition:all .2s}
+        .send-btn{background:#00d4ff;color:#000}
+        .send-btn:hover,.send-btn:active{background:#00b8e6}
+        .mic-btn{background:rgba(255,255,255,0.1);color:#fff;font-size:1.2em}
+        .mic-btn:hover{background:rgba(255,255,255,0.2)}
+        .mic-btn.recording{background:#ff4444;animation:pulse 1s infinite}
+        .mic-btn.playing{background:#00ff88;color:#000}
+        .mic-btn.connecting{background:#ffaa00;color:#000}
+        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+        .info-panel{display:flex;flex-direction:column;gap:15px}
+        @media(max-width:900px){.info-panel{display:grid;grid-template-columns:1fr 1fr;gap:10px}.info-panel .card:first-child{grid-column:1/-1}}
+        @media(max-width:500px){.info-panel{grid-template-columns:1fr}}
+        .card{background:rgba(255,255,255,0.05);border-radius:15px;padding:20px}
+        .card h3{color:#00d4ff;margin-bottom:15px;font-size:1em}
+        .step{display:flex;align-items:center;gap:10px;padding:8px 0;color:#888}
+        .step.active{color:#00d4ff}
+        .step.done{color:#00ff88}
+        .step-num{width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:.8em;flex-shrink:0}
+        .step.active .step-num{background:#00d4ff;color:#000}
+        .step.done .step-num{background:#00ff88;color:#000}
+        .suggestions{display:flex;flex-direction:column;gap:8px}
+        .suggestion{background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);padding:10px;border-radius:8px;cursor:pointer;font-size:.9em;transition:all .2s;-webkit-tap-highlight-color:transparent}
+        .suggestion:hover,.suggestion:active{background:rgba(0,212,255,0.2)}
+        .model-info{font-size:.9em}
+        .model-info div{padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1)}
+        .model-info span{color:#00d4ff}
+        .glossary-item{margin:8px 0}
+        .glossary-term{color:#00d4ff;font-weight:bold}
+        .glossary-def{color:#aaa;font-size:.9em}
+        .loading::after{content:'...';animation:dots 1s infinite}
+        @keyframes dots{0%,20%{content:'.'}40%{content:'..'}60%,100%{content:'...'}}
+        .voice-status{text-align:center;padding:5px;font-size:.8em;color:#888}
+        .voice-status.active{color:#00d4ff}
+        .voice-status.error{color:#ff4444}
+        .audio-toggle{position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.1);border:none;color:#fff;padding:10px 15px;border-radius:25px;cursor:pointer;font-size:.9em;display:flex;align-items:center;gap:8px;transition:all .2s}
+        .audio-toggle:hover{background:rgba(255,255,255,0.2)}
+        .audio-toggle.disabled{background:rgba(255,0,0,0.2);color:#ff8888}
+        @media(max-width:500px){.audio-toggle{top:10px;right:10px;padding:8px 12px;font-size:.8em}}
+    </style>
+</head>
+<body>
+<button class="audio-toggle" id="audioToggle" onclick="toggleAudio()">🔊 Audio Enabled</button>
+<div class="container">
+    <div class="header">
+        <h1>🎓 BIS AI Assistant</h1>
+        <p>Project developed by Anirudh Nair, Grade 7 Jupiter</p>
+    </div>
+    <div class="chat-panel">
+        <div class="messages" id="messages">
+            <div class="message assistant">👋 Hello! I'm your AI assistant for BIS. You can type or hold the microphone button to speak!</div>
+        </div>
+        <div class="voice-status" id="voiceStatus">🎤 Hold microphone to speak</div>
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Ask about the newsletter..." onkeypress="if(event.key==='Enter')sendTextMessage()">
+            <button class="send-btn" onclick="sendTextMessage()">Send</button>
+            <button class="mic-btn" id="micBtn" onmousedown="startVoice()" onmouseup="stopVoice()" ontouchstart="startVoice()" ontouchend="stopVoice()">🎤</button>
+        </div>
+    </div>
+    <div class="info-panel">
+        <div class="card">
+            <h3>🔄 How It Works</h3>
+            <div class="step" id="step1"><div class="step-num">1</div>Your question received</div>
+            <div class="step" id="step2"><div class="step-num">2</div>Searching Knowledge Base</div>
+            <div class="step" id="step3"><div class="step-num">3</div>AI generating response</div>
+            <div class="step" id="step4"><div class="step-num">4</div>Response complete</div>
+        </div>
+        <div class="card">
+            <h3>💡 Try These Questions</h3>
+            <div class="suggestions">
+                <div class="suggestion" onclick="askQuestion(this.innerText)">What events happened in December?</div>
+                <div class="suggestion" onclick="askQuestion(this.innerText)">Tell me about student achievements</div>
+                <div class="suggestion" onclick="askQuestion(this.innerText)">Who won the Hindi mono acting?</div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>🤖 Model Info</h3>
+            <div class="model-info">
+                <div>Voice Model: <span>Amazon Nova Sonic</span></div>
+                <div>Text Model: <span>Amazon Nova Lite</span></div>
+                <div>Voice Region: <span>eu-north-1</span></div>
+                <div>Knowledge Base: <span>eu-west-1</span></div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>📚 AI Glossary</h3>
+            <div class="glossary-item"><span class="glossary-term">Nova Sonic</span><div class="glossary-def">Amazon's real-time voice AI with bidirectional streaming</div></div>
+            <div class="glossary-item"><span class="glossary-term">RAG</span><div class="glossary-def">Retrieval-Augmented Generation - AI searches documents first</div></div>
+            <div class="glossary-item"><span class="glossary-term">WebSocket</span><div class="glossary-def">Real-time two-way communication for voice streaming</div></div>
+        </div>
+    </div>
+</div>
+<script>
+const API_URL = 'https://amfggbg1k5.execute-api.eu-west-1.amazonaws.com/chat';
+const WS_URL = 'wss://bisai-alb.demoaws.com/ws/voice';
+
+let ws = null;
+let audioContext = null;
+let mediaStream = null;
+let audioProcessor = null;
+let isRecording = false;
+let audioQueue = [];
+let isPlaying = false;
+let audioEnabled = localStorage.getItem('audioEnabled') !== 'false'; // Default enabled
+
+// Initialize audio toggle state
+window.addEventListener('DOMContentLoaded', () => {
+    updateAudioToggle();
+    updateMicButton();
+});
+
+function toggleAudio(){
+    audioEnabled = !audioEnabled;
+    localStorage.setItem('audioEnabled', audioEnabled);
+    updateAudioToggle();
+    updateMicButton();
+    
+    // Stop any ongoing audio
+    if(!audioEnabled){
+        if(ws) ws.close();
+        stopAudioCapture();
+        if(window.speechSynthesis) window.speechSynthesis.cancel();
+        document.getElementById('micBtn').classList.remove('recording', 'playing', 'connecting');
+        setVoiceStatus('🔇 Audio disabled');
+    } else {
+        setVoiceStatus('🎤 Hold microphone to speak');
+    }
+}
+
+function updateAudioToggle(){
+    const btn = document.getElementById('audioToggle');
+    if(audioEnabled){
+        btn.textContent = '🔊 Audio Enabled';
+        btn.classList.remove('disabled');
+    } else {
+        btn.textContent = '🔇 Audio Disabled';
+        btn.classList.add('disabled');
+    }
+}
+
+function updateMicButton(){
+    const micBtn = document.getElementById('micBtn');
+    micBtn.disabled = !audioEnabled;
+    micBtn.style.opacity = audioEnabled ? '1' : '0.3';
+    micBtn.style.cursor = audioEnabled ? 'pointer' : 'not-allowed';
+}
+
+function resetSteps(){for(let i=1;i<=4;i++)document.getElementById('step'+i).className='step'}
+function setStep(n,s){document.getElementById('step'+n).className='step '+s}
+function askQuestion(q){document.getElementById('userInput').value=q;sendTextMessage()}
+function setVoiceStatus(text, cls=''){
+    const el = document.getElementById('voiceStatus');
+    el.textContent = text;
+    el.className = 'voice-status' + (cls ? ' ' + cls : '');
+}
+
+// Text-based chat (fallback)
+async function sendTextMessage(){
+    const input=document.getElementById('userInput'),msg=input.value.trim();
+    if(!msg)return;
+    const messages=document.getElementById('messages');
+    messages.innerHTML+=`<div class="message user">${msg}</div>`;
+    input.value='';
+    resetSteps();setStep(1,'done');setStep(2,'active');
+    messages.innerHTML+=`<div class="message assistant" id="loading"><span class="loading">Thinking</span></div>`;
+    messages.scrollTop=messages.scrollHeight;
+    try{
+        const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+        setStep(2,'done');setStep(3,'active');
+        const data=await res.json();
+        setStep(3,'done');setStep(4,'done');
+        document.getElementById('loading').remove();
+        const answer = data.answer.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+        messages.innerHTML+=`<div class="message assistant">${answer}</div>`;
+        if(audioEnabled) speakWithBrowser(answer);
+    }catch(e){
+        document.getElementById('loading').remove();
+        messages.innerHTML+=`<div class="message assistant">Sorry, something went wrong. Please try again.</div>`;
+        resetSteps();
+    }
+    messages.scrollTop=messages.scrollHeight;
+}
+
+// Browser TTS fallback
+function speakWithBrowser(text){
+    if(!audioEnabled) return;
+    if('speechSynthesis' in window){
+        const cleanText = text.replace(/\*\*/g, '').replace(/\n/g, '. ').substring(0, 500);
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        const micBtn = document.getElementById('micBtn');
+        utterance.onstart = () => { micBtn.classList.add('playing'); setVoiceStatus('🔊 Speaking...', 'active'); };
+        utterance.onend = () => { micBtn.classList.remove('playing'); setVoiceStatus('🎤 Hold microphone to speak'); };
+        speechSynthesis.speak(utterance);
+    }
+}
+
+// Nova Sonic WebSocket voice
+async function startVoice(){
+    if(!audioEnabled) return;
+    
+    const micBtn = document.getElementById('micBtn');
+    micBtn.classList.add('connecting');
+    setVoiceStatus('⏳ Connecting to Nova Sonic...', 'active');
+    
+    try {
+        // Get microphone access
+        mediaStream = await navigator.mediaDevices.getUserMedia({audio: {sampleRate: 16000, channelCount: 1}});
+        audioContext = new AudioContext({sampleRate: 16000});
+        
+        // Connect WebSocket
+        ws = new WebSocket(WS_URL);
+        
+        ws.onopen = () => {
+            micBtn.classList.remove('connecting');
+            micBtn.classList.add('recording');
+            setVoiceStatus('🔴 Listening... Release to stop', 'active');
+            isRecording = true;
+            startAudioCapture();
+        };
+        
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            handleWSMessage(msg);
+        };
+        
+        ws.onerror = () => {
+            setVoiceStatus('❌ Connection failed, using browser voice', 'error');
+            fallbackToBrowserVoice();
+        };
+        
+        ws.onclose = () => {
+            stopAudioCapture();
+            micBtn.classList.remove('recording', 'connecting');
+        };
+        
+    } catch(e) {
+        setVoiceStatus('❌ ' + e.message, 'error');
+        micBtn.classList.remove('connecting');
+        fallbackToBrowserVoice();
+    }
+}
+
+function stopVoice(){
+    if(!audioEnabled) return;
+    
+    isRecording = false;
+    const micBtn = document.getElementById('micBtn');
+    micBtn.classList.remove('recording');
+    
+    if(ws && ws.readyState === WebSocket.OPEN){
+        ws.send(JSON.stringify({type: 'stop'}));
+        setTimeout(() => ws.close(), 500);
+    }
+    stopAudioCapture();
+    setVoiceStatus('🎤 Hold microphone to speak');
+}
+
+function startAudioCapture(){
+    if(!audioContext || !mediaStream) return;
+    
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+    
+    audioProcessor.onaudioprocess = (e) => {
+        if(!isRecording || !ws || ws.readyState !== WebSocket.OPEN) return;
+        
+        const inputData = e.inputBuffer.getChannelData(0);
+        const pcm16 = new Int16Array(inputData.length);
+        for(let i = 0; i < inputData.length; i++){
+            pcm16[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+        }
+        
+        ws.send(JSON.stringify({
+            type: 'audio',
+            audio: btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)))
+        }));
+    };
+    
+    source.connect(audioProcessor);
+    audioProcessor.connect(audioContext.destination);
+}
+
+function stopAudioCapture(){
+    if(audioProcessor){
+        audioProcessor.disconnect();
+        audioProcessor = null;
+    }
+    if(mediaStream){
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+    }
+}
+
+function handleWSMessage(msg){
+    if(!audioEnabled && msg.type === 'audio') return; // Skip audio playback if disabled
+    
+    const messages = document.getElementById('messages');
+    const micBtn = document.getElementById('micBtn');
+    
+    switch(msg.type){
+        case 'ready':
+            setVoiceStatus('🔴 Listening...', 'active');
+            break;
+        case 'transcript':
+            if(msg.role === 'user'){
+                messages.innerHTML += `<div class="message user">${msg.text}</div>`;
+                resetSteps(); setStep(1,'done'); setStep(2,'active');
+            } else {
+                // Update or create assistant message
+                let lastMsg = messages.querySelector('.message.assistant:last-child');
+                if(!lastMsg || lastMsg.id === 'loading'){
+                    if(document.getElementById('loading')) document.getElementById('loading').remove();
+                    messages.innerHTML += `<div class="message assistant">${msg.text}</div>`;
+                } else {
+                    lastMsg.textContent = msg.text;
+                }
+                setStep(2,'done'); setStep(3,'active');
+            }
+            messages.scrollTop = messages.scrollHeight;
+            break;
+        case 'audio':
+            if(audioEnabled){
+                playAudio(msg.audio);
+                micBtn.classList.add('playing');
+                setVoiceStatus('🔊 Speaking...', 'active');
+            }
+            break;
+        case 'complete':
+            setStep(3,'done'); setStep(4,'done');
+            micBtn.classList.remove('playing');
+            setVoiceStatus('🎤 Hold microphone to speak');
+            break;
+        case 'interrupted':
+            setVoiceStatus('⏸️ Interrupted', 'active');
+            break;
+        case 'error':
+            setVoiceStatus('❌ ' + msg.message, 'error');
+            break;
+    }
+}
+
+async function playAudio(base64Audio){
+    if(!audioEnabled) return;
+    if(!audioContext) audioContext = new AudioContext({sampleRate: 16000});
+    
+    const binary = atob(base64Audio);
+    const bytes = new Uint8Array(binary.length);
+    for(let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    
+    // Convert PCM16 to Float32
+    const pcm16 = new Int16Array(bytes.buffer);
+    const float32 = new Float32Array(pcm16.length);
+    for(let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768;
+    
+    const buffer = audioContext.createBuffer(1, float32.length, 16000);
+    buffer.getChannelData(0).set(float32);
+    
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.start();
+}
+
+function fallbackToBrowserVoice(){
+    if(!audioEnabled) return;
+    
+    // Use browser speech recognition as fallback
+    if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.onresult = (e) => {
+            document.getElementById('userInput').value = e.results[0][0].transcript;
+            sendTextMessage();
+        };
+        recognition.onerror = () => setVoiceStatus('🎤 Hold microphone to speak');
+        recognition.onend = () => document.getElementById('micBtn').classList.remove('recording');
+        recognition.start();
+        document.getElementById('micBtn').classList.add('recording');
+        setVoiceStatus('🔴 Listening (browser)...', 'active');
+    }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIS AI Voice Assistant</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { overflow: hidden; width: 100%; height: 100vh; font-family: system-ui, sans-serif; background: #1a1a2e; color: #fff; }
+        #renderCanvas { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 0; }
+        .overlay { position: fixed; z-index: 10; pointer-events: none; }
+        .top-bar { top: 20px; left: 0; width: 100%; text-align: center; }
+        .top-bar h1 { font-size: 1.5rem; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+        .top-bar .subtitle { color: #aaa; font-size: 0.9rem; }
+        .bottom-panel { bottom: 20px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: auto; }
+        #micBtn { width: 80px; height: 80px; border-radius: 50%; border: none; background: linear-gradient(145deg, #e94560, #c73e54); color: #fff; font-size: 2rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 8px 32px rgba(233,69,96,0.3); }
+        #micBtn:hover { transform: scale(1.05); }
+        #micBtn.recording { background: linear-gradient(145deg, #4ade80, #22c55e); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.4); } 50% { box-shadow: 0 0 0 20px rgba(74,222,128,0); } }
+        #status { margin-top: 0.5rem; font-size: 0.95rem; min-height: 1.3rem; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+        #transcript { position: fixed; bottom: 130px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); border-radius: 12px; padding: 0.8rem; z-index: 10; text-align: left; }
+        .msg { padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem; }
+        .msg.user { color: #4ade80; }
+        .msg.assistant { color: #60a5fa; }
+        .msg.system { color: #fbbf24; font-style: italic; }
+        .msg:last-child { border-bottom: none; }
+        .preview { opacity: 0.6; }
+        #loadScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a2e; display: flex; align-items: center; justify-content: center; flex-direction: column; z-index: 999; }
+        .loader { border: 6px solid rgba(96,165,250,0.2); border-top: 6px solid #60a5fa; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        #loadScreen p { margin-top: 1rem; color: #888; }
+    </style>
+    <link rel="preload" href="/assets/3d/characters/adult_male/jay/jay.gltf" as="fetch" crossorigin>
+    <link rel="preload" href="/assets/3d/host.three.js" as="script">
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.645.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.127.0/build/three.min.js"></script>
+    <script src="/assets/3d/host.three.js"></script>
+</head>
+<body>
+    <div id="loadScreen"><div class="loader"></div><p id="loadText">Loading 3D Avatar...</p></div>
+    <div class="overlay top-bar">
+        <h1>🎓 BIS AI Voice Assistant</h1>
+        <p class="subtitle">Project developed by Anirudh Nair, Grade 7 Jupiter</p>
+    </div>
+    <div id="transcript"></div>
+    <div class="overlay bottom-panel">
+        <button id="micBtn" onclick="toggleRecording()">🎤</button>
+        <div id="status">Click to start talking</div>
+    </div>
+
+    <script type="module">
+        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.127.0/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.127.0/examples/jsm/loaders/GLTFLoader.js';
+
+        const ASSET_BASE = '/assets/3d';
+        const WS_URL = 'wss://bisai-alb.demoaws.com/voice';
+        const renderFn = [];
+        let host, scene, camera, clock, renderer;
+
+        // Voice state
+        let ws, audioCtx, mediaStream, isRecording = false;
+        let playbackCtx, nextPlayTime = 0;
+        const pendingBuffers = [];
+        let isAssistantSpeaking = false;
+        let analyser, analyserData;
+
+        // Make toggleRecording global
+        window.toggleRecording = async function() { if (isRecording) stopRecording(); else await startRecording(); };
+
+        await init3D();
+
+        async function init3D() {
+            // Scene
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+            scene.background = new THREE.Color(0x1a1a2e);
+            scene.fog = new THREE.Fog(0x1a1a2e, 0, 12);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.shadowMap.enabled = true;
+            renderer.setClearColor(0x1a1a2e);
+            renderer.domElement.id = 'renderCanvas';
+            document.body.appendChild(renderer.domElement);
+
+            // Environment map (loaded lazily after avatar)
+            const pmremGen = new THREE.PMREMGenerator(renderer);
+            pmremGen.compileEquirectangularShader();
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(0.8), window.innerWidth / window.innerHeight, 0.1, 1000);
+            const controls = new OrbitControls(camera, renderer.domElement);
+            camera.position.set(0, 1.4, 3.1);
+            controls.target = new THREE.Vector3(0, 0.8, 0);
+            controls.screenSpacePanning = true;
+            controls.update();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // Lights
+            const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.6);
+            hemi.position.set(0, 1, 0);
+            scene.add(hemi);
+            const dir = new THREE.DirectionalLight(0xffffff);
+            dir.position.set(0, 5, 5);
+            dir.castShadow = true;
+            dir.shadow.mapSize.set(1024, 1024);
+            scene.add(dir);
+            const dirTarget = new THREE.Object3D();
+            dir.add(dirTarget);
+            dirTarget.position.set(0, -0.5, -1.0);
+            dir.target = dirTarget;
+
+            // Ground
+            const ground = new THREE.Mesh(
+                new THREE.PlaneBufferGeometry(100, 100),
+                new THREE.MeshStandardMaterial({ color: 0x1a1a2e, depthWrite: false, metalness: 0 })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Load character, animations, and configs ALL in parallel
+            const gltfLoader = new GLTFLoader();
+            const charPath = `${ASSET_BASE}/characters/adult_male/jay/jay.gltf`;
+            const animPath = `${ASSET_BASE}/animations/adult_male`;
+            const animFiles = ['stand_idle.glb', 'lipsync.glb', 'gesture.glb', 'emote.glb', 'face_idle.glb', 'blink.glb', 'poi.glb'];
+
+            const loadText = document.getElementById('loadText');
+            let loaded = 0;
+            const total = 1 + animFiles.length + 2; // char + anims + 2 json
+            function trackLoad(name) { return (result) => { loaded++; loadText.textContent = `Loading... ${Math.round(loaded/total*100)}%`; return result; }; }
+            function loadAsset(path) { return new Promise(resolve => gltfLoader.load(path, resolve)); }
+
+            const [charGltf, ...animResults] = await Promise.all([
+                loadAsset(charPath).then(trackLoad('character')),
+                ...animFiles.map(f => loadAsset(`${animPath}/${f}`).then(trackLoad(f))),
+            ]);
+            const [gestureConfig, poiConfig] = await Promise.all([
+                fetch(`${animPath}/gesture.json`).then(r => r.json()).then(trackLoad('gesture.json')),
+                fetch(`${animPath}/poi.json`).then(r => r.json()).then(trackLoad('poi.json')),
+            ]);
+
+            const character = charGltf.scene;
+            scene.add(character);
+            const [bindPoseOffset] = charGltf.animations;
+            if (bindPoseOffset) THREE.AnimationUtils.makeClipAdditive(bindPoseOffset);
+            character.traverse(o => { if (o.isMesh) o.castShadow = true; });
+            const clips = animResults.map(g => g.animations);
+            character.position.set(0, 0, 0);
+
+            const audioAttachJoint = character.getObjectByName('chardef_c_neckB');
+            const lookJoint = character.getObjectByName('charjx_c_look');
+
+            const [idleClips, lipsyncClips, gestureClips, emoteClips, faceClips, blinkClips, poiClips] = clips;
+
+            host = createHost(character, audioAttachJoint, idleClips[0], faceClips[0], lipsyncClips, gestureClips, gestureConfig, emoteClips, blinkClips, poiClips, poiConfig, lookJoint, bindPoseOffset);
+
+            // Render loop
+            function render() {
+                requestAnimationFrame(render);
+                controls.update();
+                renderFn.forEach(fn => fn());
+                renderer.render(scene, camera);
+            }
+            render();
+
+            // Hide loading screen
+            document.getElementById('loadScreen').style.display = 'none';
+
+            // Load environment map lazily
+            new THREE.TextureLoader().setPath(`${ASSET_BASE}/`).load('images/machine_shop.jpg', hdrEquirect => {
+                const hdrCube = pmremGen.fromEquirectangular(hdrEquirect);
+                hdrEquirect.dispose(); pmremGen.dispose();
+                scene.environment = hdrCube.texture;
+            });
+        }
+
+        function createHost(character, audioAttachJoint, idleClip, faceIdleClip, lipsyncClips, gestureClips, gestureConfig, emoteClips, blinkClips, poiClips, poiConfig, lookJoint, bindPoseOffset) {
+            const h = new HOST.HostObject({ owner: character, clock });
+            renderFn.push(() => h.update());
+
+            // Animation feature
+            h.addFeature(HOST.anim.AnimationFeature);
+
+            // Base idle
+            h.AnimationFeature.addLayer('Base');
+            h.AnimationFeature.addAnimation('Base', idleClip.name, HOST.anim.AnimationTypes.single, { clip: idleClip });
+            h.AnimationFeature.playAnimation('Base', idleClip.name);
+
+            // Face idle
+            h.AnimationFeature.addLayer('Face', { blendMode: HOST.anim.LayerBlendModes.Additive });
+            THREE.AnimationUtils.makeClipAdditive(faceIdleClip);
+            h.AnimationFeature.addAnimation('Face', faceIdleClip.name, HOST.anim.AnimationTypes.single, {
+                clip: THREE.AnimationUtils.subclip(faceIdleClip, faceIdleClip.name, 1, faceIdleClip.duration * 30, 30)
+            });
+            h.AnimationFeature.playAnimation('Face', faceIdleClip.name);
+
+            // Blink
+            h.AnimationFeature.addLayer('Blink', { blendMode: HOST.anim.LayerBlendModes.Additive, transitionTime: 0.075 });
+            blinkClips.forEach(c => THREE.AnimationUtils.makeClipAdditive(c));
+            h.AnimationFeature.addAnimation('Blink', 'blink', HOST.anim.AnimationTypes.randomAnimation, {
+                playInterval: 3,
+                subStateOptions: blinkClips.map(c => ({ name: c.name, loopCount: 1, clip: c }))
+            });
+            h.AnimationFeature.playAnimation('Blink', 'blink');
+
+            // Talk layer
+            h.AnimationFeature.addLayer('Talk', { transitionTime: 0.75, blendMode: HOST.anim.LayerBlendModes.Additive });
+            h.AnimationFeature.setLayerWeight('Talk', 0);
+            const talkClip = lipsyncClips.find(c => c.name === 'stand_talk');
+            lipsyncClips.splice(lipsyncClips.indexOf(talkClip), 1);
+            h.AnimationFeature.addAnimation('Talk', talkClip.name, HOST.anim.AnimationTypes.single, {
+                clip: THREE.AnimationUtils.makeClipAdditive(talkClip)
+            });
+            h.AnimationFeature.playAnimation('Talk', talkClip.name);
+
+            // Viseme layer
+            h.AnimationFeature.addLayer('Viseme', { transitionTime: 0.12, blendMode: HOST.anim.LayerBlendModes.Additive });
+            h.AnimationFeature.setLayerWeight('Viseme', 0);
+            const blendStateOptions = lipsyncClips.map(c => {
+                THREE.AnimationUtils.makeClipAdditive(c);
+                return { name: c.name, clip: THREE.AnimationUtils.subclip(c, c.name, 1, 2, 30), weight: 0 };
+            });
+            h.AnimationFeature.addAnimation('Viseme', 'visemes', HOST.anim.AnimationTypes.freeBlend, { blendStateOptions });
+            h.AnimationFeature.playAnimation('Viseme', 'visemes');
+
+            // Gesture layer
+            h.AnimationFeature.addLayer('Gesture', { transitionTime: 0.5, blendMode: HOST.anim.LayerBlendModes.Additive });
+            gestureClips.forEach(clip => {
+                const config = gestureConfig[clip.name];
+                THREE.AnimationUtils.makeClipAdditive(clip);
+                if (config) {
+                    config.queueOptions.forEach(opt => {
+                        opt.clip = THREE.AnimationUtils.subclip(clip, `${clip.name}_${opt.name}`, opt.from, opt.to, 30);
+                    });
+                    h.AnimationFeature.addAnimation('Gesture', clip.name, HOST.anim.AnimationTypes.queue, config);
+                } else {
+                    h.AnimationFeature.addAnimation('Gesture', clip.name, HOST.anim.AnimationTypes.single, { clip });
+                }
+            });
+
+            // POI
+            poiConfig.forEach(config => {
+                h.AnimationFeature.addLayer(config.name, { blendMode: HOST.anim.LayerBlendModes.Additive });
+                config.blendStateOptions.forEach(cc => {
+                    const clip = poiClips.find(c => c.name === cc.clip);
+                    THREE.AnimationUtils.makeClipAdditive(clip);
+                    cc.clip = THREE.AnimationUtils.subclip(clip, clip.name, 1, 2, 30);
+                });
+                h.AnimationFeature.addAnimation(config.name, config.animation, HOST.anim.AnimationTypes.blend2d, { ...config });
+                h.AnimationFeature.playAnimation(config.name, config.animation);
+                config.reference = character.getObjectByName(config.reference.replace(':', ''));
+            });
+
+            // BindPoseOffset
+            if (bindPoseOffset) {
+                h.AnimationFeature.addLayer('BindPoseOffset', { blendMode: HOST.anim.LayerBlendModes.Additive });
+                h.AnimationFeature.addAnimation('BindPoseOffset', bindPoseOffset.name, HOST.anim.AnimationTypes.single, {
+                    clip: THREE.AnimationUtils.subclip(bindPoseOffset, bindPoseOffset.name, 1, 2, 30)
+                });
+                h.AnimationFeature.playAnimation('BindPoseOffset', bindPoseOffset.name);
+            }
+
+            // POI feature - look at camera
+            h.addFeature(HOST.PointOfInterestFeature, false,
+                { target: camera, lookTracker: lookJoint, scene },
+                { layers: poiConfig },
+                { layers: [{ name: 'Blink' }] }
+            );
+
+            // Emote layer
+            h.AnimationFeature.addLayer('Emote', { transitionTime: 0.5 });
+            emoteClips.forEach(clip => {
+                h.AnimationFeature.addAnimation('Emote', clip.name, HOST.anim.AnimationTypes.single, { clip, loopCount: 1 });
+            });
+
+            // GestureFeature - enables playGesture API
+            h.addFeature(HOST.GestureFeature, false, {
+                layers: {
+                    Gesture: { minimumInterval: 3 },
+                    Emote: { blendTime: 0.5, easingFn: HOST.anim.Easing.Quadratic.InOut },
+                },
+            });
+
+            return h;
+        }
+
+        // --- Audio-driven viseme animation (optimized) ---
+        const visemeMap = ['sil', 'a', 'o', 'e', 'i', 'u', 'f', 'k', 's', 'T', 't', 'S', 'r', 'p', 'E', 'O', '@'];
+        let visemeFrame;
+        const prevWeights = {}; visemeMap.forEach(v => prevWeights[v] = 0);
+
+        // --- Random gestures during speech ---
+        const speakingGestures = ['generic_a', 'generic_b', 'generic_c', 'big', 'one', 'many', 'self', 'you', 'in', 'movement'];
+        let gestureTimer = null;
+
+        function triggerRandomGesture() {
+            if (!host || !isAssistantSpeaking) return;
+            try {
+                const g = speakingGestures[Math.floor(Math.random() * speakingGestures.length)];
+                host.GestureFeature.playGesture('Gesture', g);
+            } catch(e) {}
+            // Next gesture in 3-7 seconds
+            gestureTimer = setTimeout(triggerRandomGesture, 3000 + Math.random() * 4000);
+        }
+
+        function startSpeakingGestures() {
+            if (gestureTimer) return;
+            // First gesture after 1-2s delay
+            gestureTimer = setTimeout(triggerRandomGesture, 1000 + Math.random() * 1000);
+        }
+
+        function stopSpeakingGestures() {
+            if (gestureTimer) { clearTimeout(gestureTimer); gestureTimer = null; }
+        }
+
+        function startVisemeAnim() {
+            if (!host || !analyser) return;
+            host.AnimationFeature.setLayerWeight('Viseme', 1);
+            host.AnimationFeature.setLayerWeight('Talk', 1);
+            startSpeakingGestures();
+            animateVisemes();
+        }
+
+        function stopVisemeAnim() {
+            if (visemeFrame) { cancelAnimationFrame(visemeFrame); visemeFrame = null; }
+            stopSpeakingGestures();
+            if (host) {
+                try { visemeMap.forEach(v => { prevWeights[v] = 0; host.AnimationFeature.setAnimationBlendWeight('Viseme', 'visemes', v, 0, 0.1); }); } catch(e) {}
+                host.AnimationFeature.setLayerWeight('Viseme', 0);
+                host.AnimationFeature.setLayerWeight('Talk', 0);
+            }
+        }
+
+        function animateVisemes() {
+            if (!analyser || !isAssistantSpeaking) { stopVisemeAnim(); return; }
+            analyser.getByteTimeDomainData(analyserData);
+
+            // RMS amplitude
+            let rms = 0;
+            for (let i = 0; i < analyserData.length; i++) {
+                const v = (analyserData[i] - 128) / 128;
+                rms += v * v;
+            }
+            rms = Math.sqrt(rms / analyserData.length);
+            const amplitude = Math.min(rms * 5, 1);
+
+            // Frequency data
+            const freqData = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(freqData);
+            const low = Math.min((freqData[2] + freqData[3] + freqData[4]) / (3 * 120), 1);
+            const mid = Math.min((freqData[6] + freqData[8] + freqData[10]) / (3 * 140), 1);
+            const high = Math.min((freqData[14] + freqData[18] + freqData[22]) / (3 * 160), 1);
+
+            const target = {};
+            visemeMap.forEach(v => target[v] = 0);
+
+            const t = performance.now() / 150;
+            const c1 = Math.sin(t) * 0.5 + 0.5;
+            const c2 = Math.cos(t * 1.3) * 0.5 + 0.5;
+            const c3 = Math.sin(t * 0.7 + 1) * 0.5 + 0.5;
+
+            if (amplitude > 0.02) {
+                // Amplified weights (2x) for more visible mouth movement
+                const a = amplitude * 2;
+                target['a'] = a * (0.5 + c1 * 0.5);
+                target['o'] = a * (0.3 + c2 * 0.4) * low;
+                target['O'] = a * 0.3 * (1 - c1);
+                target['e'] = a * c2 * 0.6 * mid;
+                target['E'] = a * (1 - c2) * 0.5;
+                target['i'] = a * c1 * 0.4 * mid;
+                target['u'] = a * (1 - c1) * 0.3;
+                target['@'] = a * 0.4 * c3;
+                target['f'] = high * 1.2;
+                target['s'] = high * 1.0 * c1;
+                target['S'] = high * 0.6 * c3;
+                target['T'] = high * 0.8 * (1 - c1);
+                target['k'] = a * 0.3 * (amplitude > 0.3 ? 1 : 0);
+                target['p'] = amplitude > 0.25 ? 1.0 * c2 : 0;
+                target['r'] = mid * 0.8 * c1;
+                target['t'] = mid * 0.6 * c3;
+            } else {
+                target['sil'] = 1;
+            }
+
+            // Smooth: lerp 40% toward target each frame
+            const lerp = 0.4;
+            try {
+                visemeMap.forEach(v => {
+                    const w = prevWeights[v] + (target[v] - prevWeights[v]) * lerp;
+                    prevWeights[v] = w;
+                    host.AnimationFeature.setAnimationBlendWeight('Viseme', 'visemes', v, w, 0);
+                });
+            } catch(e) { console.warn('viseme error', e); }
+
+            visemeFrame = requestAnimationFrame(animateVisemes);
+        }
+
+        // --- Voice WebSocket ---
+        function setupAnalyser() {
+            if (!playbackCtx || analyser) return;
+            analyser = playbackCtx.createAnalyser();
+            analyser.fftSize = 128;
+            analyserData = new Uint8Array(analyser.frequencyBinCount);
+        }
+
+        async function startRecording() {
+            try {
+                setStatus('⏳ Connecting to AI...');
+                // Request mic early while WebSocket connects
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+                setStatus('⏳ Setting up voice session...');
+                await new Promise((resolve, reject) => {
+                    ws = new WebSocket(WS_URL);
+                    ws.onopen = () => resolve();
+                    ws.onerror = () => reject(new Error('Connection failed - please try again'));
+                });
+                audioCtx = new AudioContext({ sampleRate: 16000 });
+                playbackCtx = new AudioContext({ sampleRate: 16000 });
+                nextPlayTime = playbackCtx.currentTime;
+                analyser = null;
+                const source = audioCtx.createMediaStreamSource(mediaStream);
+                const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+                processor.onaudioprocess = (e) => {
+                    if (ws?.readyState === WebSocket.OPEN) {
+                        const pcm = e.inputBuffer.getChannelData(0);
+                        const int16 = new Int16Array(pcm.length);
+                        for (let i = 0; i < pcm.length; i++) int16[i] = Math.max(-32768, Math.min(32767, pcm[i] * 32768));
+                        ws.send(JSON.stringify({ type: 'audio', data: arrayBufferToBase64(int16.buffer) }));
+                    }
+                };
+                source.connect(processor);
+                processor.connect(audioCtx.destination);
+                isRecording = true;
+                updateMicButton();
+                setStatus('🎙️ Listening... speak anytime');
+                ws.onmessage = (e) => {
+                    const msg = JSON.parse(e.data);
+                    if (msg.type === 'audio') {
+                        scheduleAudio(msg.data);
+                        if (!isAssistantSpeaking) { isAssistantSpeaking = true; updateMicButton(); startVisemeAnim(); setStatus('🔊 Speaking... (interrupt anytime)'); }
+                    } else if (msg.type === 'transcript') { updateTranscript(msg.role, msg.text, msg.is_final);
+                    } else if (msg.type === 'interruption') { clearAudioQueue(); isAssistantSpeaking = false; updateMicButton(); stopVisemeAnim(); setStatus('🎙️ Listening...'); addSystemMessage('⚡ Interrupted');
+                    } else if (msg.type === 'response_end') { isAssistantSpeaking = false; updateMicButton(); stopVisemeAnim(); setStatus('🎙️ Listening... speak anytime');
+                    } else if (msg.type === 'error') { setStatus('❌ ' + msg.message); }
+                };
+                ws.onclose = () => { stopRecording(); setStatus('Disconnected - click to reconnect'); };
+                ws.onerror = () => { stopRecording(); setStatus('Connection error'); };
+            } catch (err) { setStatus('Error: ' + err.message); }
+        }
+
+        function stopRecording() {
+            if (ws?.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({ type: 'stop' })); ws.close(); }
+            if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+            if (audioCtx) audioCtx.close().catch(() => {});
+            if (playbackCtx) playbackCtx.close().catch(() => {});
+            clearAudioQueue(); stopVisemeAnim();
+            isRecording = false; isAssistantSpeaking = false; analyser = null;
+            updateMicButton(); setStatus('Click to start talking');
+        }
+
+        function arrayBufferToBase64(buf) { const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s); }
+        function base64ToInt16Array(b64) { const s = atob(b64); const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return new Int16Array(b.buffer); }
+
+        function scheduleAudio(b64) {
+            if (!playbackCtx) return;
+            setupAnalyser();
+            const int16 = base64ToInt16Array(b64);
+            const f32 = new Float32Array(int16.length);
+            for (let i = 0; i < int16.length; i++) f32[i] = int16[i] / 32768;
+            const buffer = playbackCtx.createBuffer(1, f32.length, 16000);
+            buffer.copyToChannel(f32, 0);
+            const src = playbackCtx.createBufferSource();
+            src.buffer = buffer;
+            src.connect(analyser);
+            analyser.connect(playbackCtx.destination);
+            const now = playbackCtx.currentTime;
+            if (nextPlayTime < now) nextPlayTime = now;
+            src.start(nextPlayTime);
+            pendingBuffers.push(src);
+            nextPlayTime += buffer.duration;
+            src.onended = () => { const i = pendingBuffers.indexOf(src); if (i > -1) pendingBuffers.splice(i, 1); };
+        }
+
+        function clearAudioQueue() { pendingBuffers.forEach(s => { try { s.stop(); } catch(e){} }); pendingBuffers.length = 0; if (playbackCtx) nextPlayTime = playbackCtx.currentTime; }
+
+        let currentPreview = null;
+        function updateTranscript(role, text, isFinal) {
+            const div = document.getElementById('transcript');
+            if (!isFinal) {
+                if (!currentPreview || currentPreview.dataset.role !== role) { currentPreview = document.createElement('div'); currentPreview.className = 'msg ' + role + ' preview'; currentPreview.dataset.role = role; div.appendChild(currentPreview); }
+                currentPreview.textContent = (role === 'user' ? '👤 ' : '🤖 ') + text + '...';
+            } else {
+                if (currentPreview && currentPreview.dataset.role === role) { currentPreview.classList.remove('preview'); currentPreview.textContent = (role === 'user' ? '👤 ' : '🤖 ') + text; currentPreview = null; }
+                else { const p = document.createElement('div'); p.className = 'msg ' + role; p.textContent = (role === 'user' ? '👤 ' : '🤖 ') + text; div.appendChild(p); }
+            }
+            div.scrollTop = div.scrollHeight;
+        }
+        function addSystemMessage(text) { const div = document.getElementById('transcript'); const p = document.createElement('div'); p.className = 'msg system'; p.textContent = text; div.appendChild(p); div.scrollTop = div.scrollHeight; }
+        function updateMicButton() { const btn = document.getElementById('micBtn'); btn.classList.remove('recording'); if (!isRecording) btn.textContent = '🎤'; else { btn.classList.add('recording'); btn.textContent = '🎙️'; } }
+        function setStatus(s) { document.getElementById('status').textContent = s; }
+    </script>
+</body>
+</html>
