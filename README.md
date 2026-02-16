@@ -1,4 +1,6 @@
-# BIS AI Assistant 🎓
+# BIS AI Assistant
+
+> Educational AI Assistant for Bhavans Indian School Bahrain 🎓
 
 An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** featuring:
 - 🎤 Real-time voice conversations using Amazon Nova 2 Sonic
