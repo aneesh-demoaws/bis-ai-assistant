@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIS AI Voice Assistant</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; }
+        .container { text-align: center; padding: 2rem; max-width: 500px; }
+        h1 { margin-bottom: 0.5rem; font-size: 1.8rem; }
+        .subtitle { color: #888; margin-bottom: 1.5rem; }
+
+        /* Avatar */
+        .avatar-container { position: relative; width: 160px; height: 160px; margin: 0 auto 1.5rem; }
+        .avatar-wrapper { width: 160px; height: 160px; position: relative; z-index: 2; }
+        .avatar-wrapper.speaking { animation: headBob 0.6s ease-in-out infinite alternate; }
+        .avatar-wrapper.listening { animation: headTilt 2s ease-in-out infinite alternate; }
+        @keyframes headBob { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(-3px) rotate(1deg); } }
+        @keyframes headTilt { 0% { transform: rotate(-1deg); } 100% { transform: rotate(1deg); } }
+
+        .avatar-svg { width: 160px; height: 160px; filter: drop-shadow(0 8px 24px rgba(59,130,246,0.4)); }
+
+        /* Blink animation */
+        .eye-lid { transform-origin: center; animation: blink 4s ease-in-out infinite; }
+        @keyframes blink { 0%, 92%, 100% { transform: scaleY(0); } 94%, 98% { transform: scaleY(1); } }
+
+        /* Mouth animation driven by JS */
+        #mouth { transition: d 0.08s ease; }
+
+        /* Sound waves */
+        .sound-wave { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 160px; height: 160px; border-radius: 50%; border: 2px solid rgba(59,130,246,0.4); opacity: 0; z-index: 1; pointer-events: none; }
+        .avatar-wrapper.speaking ~ .sound-wave { animation: soundWave 1.5s ease-out infinite; }
+        .sound-wave:nth-child(3) { animation-delay: 0.5s; }
+        .sound-wave:nth-child(4) { animation-delay: 1s; }
+        @keyframes soundWave { 0% { width: 160px; height: 160px; opacity: 0.5; } 100% { width: 260px; height: 260px; opacity: 0; } }
+
+        #micBtn { width: 100px; height: 100px; border-radius: 50%; border: none; background: linear-gradient(145deg, #e94560, #c73e54); color: #fff; font-size: 2.5rem; cursor: pointer; transition: all 0.3s; box-shadow: 0 8px 32px rgba(233,69,96,0.3); }
+        #micBtn:hover { transform: scale(1.05); }
+        #micBtn.recording { background: linear-gradient(145deg, #4ade80, #22c55e); animation: pulse 1.5s infinite; }
+        #micBtn:disabled { background: #444; cursor: not-allowed; }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.4); } 50% { box-shadow: 0 0 0 20px rgba(74,222,128,0); } }
+        #status { margin-top: 1rem; font-size: 1.1rem; min-height: 1.5rem; }
+        #transcript { margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.1); border-radius: 12px; min-height: 100px; max-height: 250px; overflow-y: auto; text-align: left; }
+        .msg { padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .msg.user { color: #4ade80; }
+        .msg.assistant { color: #60a5fa; }
+        .msg.system { color: #fbbf24; font-style: italic; }
+        .msg:last-child { border-bottom: none; }
+        .preview { opacity: 0.6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 BIS AI Assistant</h1>
+        <p class="subtitle">Bhavans Indian School Voice Chat</p>
+
+        <div class="avatar-container">
+            <div class="avatar-wrapper" id="avatarWrapper">
+                <svg class="avatar-svg" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Background circle -->
+                    <circle cx="80" cy="80" r="78" fill="url(#bgGrad)" stroke="#fff" stroke-width="3"/>
+                    <defs>
+                        <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#60a5fa"/>
+                            <stop offset="100%" stop-color="#3b82f6"/>
+                        </linearGradient>
+                        <linearGradient id="skinGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#fdd9b5"/>
+                            <stop offset="100%" stop-color="#f5c49c"/>
+                        </linearGradient>
+                        <linearGradient id="hairGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#3d2b1f"/>
+                            <stop offset="100%" stop-color="#2a1d14"/>
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Neck -->
+                    <rect x="68" y="115" width="24" height="16" rx="4" fill="url(#skinGrad)"/>
+
+                    <!-- Shirt/collar -->
+                    <path d="M50 130 Q80 120 110 130 Q115 145 115 160 L45 160 Q45 145 50 130Z" fill="#1e40af"/>
+                    <path d="M72 125 L80 140 L88 125" fill="none" stroke="#fff" stroke-width="2"/>
+
+                    <!-- Face -->
+                    <ellipse cx="80" cy="82" rx="38" ry="42" fill="url(#skinGrad)"/>
+
+                    <!-- Hair -->
+                    <path d="M42 72 Q42 38 80 35 Q118 38 118 72 Q118 58 110 50 Q100 42 80 40 Q60 42 50 50 Q42 58 42 72Z" fill="url(#hairGrad)"/>
+                    <!-- Side hair -->
+                    <path d="M42 72 Q40 65 43 55" fill="none" stroke="url(#hairGrad)" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M118 72 Q120 65 117 55" fill="none" stroke="url(#hairGrad)" stroke-width="6" stroke-linecap="round"/>
+
+                    <!-- Eyebrows -->
+                    <path d="M58 68 Q65 64 72 67" fill="none" stroke="#3d2b1f" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M88 67 Q95 64 102 68" fill="none" stroke="#3d2b1f" stroke-width="2" stroke-linecap="round"/>
+
+                    <!-- Eyes -->
+                    <ellipse cx="65" cy="78" rx="7" ry="7" fill="#fff"/>
+                    <ellipse cx="95" cy="78" rx="7" ry="7" fill="#fff"/>
+                    <ellipse cx="65" cy="78" rx="4" ry="4" fill="#2d1b0e"/>
+                    <ellipse cx="95" cy="78" rx="4" ry="4" fill="#2d1b0e"/>
+                    <ellipse cx="66.5" cy="76.5" rx="1.5" ry="1.5" fill="#fff"/>
+                    <ellipse cx="96.5" cy="76.5" rx="1.5" ry="1.5" fill="#fff"/>
+
+                    <!-- Eyelids for blink -->
+                    <ellipse class="eye-lid" cx="65" cy="78" rx="8" ry="7" fill="url(#skinGrad)"/>
+                    <ellipse class="eye-lid" cx="95" cy="78" rx="8" ry="7" fill="url(#skinGrad)"/>
+
+                    <!-- Nose -->
+                    <path d="M78 85 Q80 92 82 85" fill="none" stroke="#e8b48a" stroke-width="1.5" stroke-linecap="round"/>
+
+                    <!-- Mouth - animated via JS -->
+                    <path id="mouth" d="M68 100 Q80 106 92 100" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- Mouth fill for open state -->
+                    <path id="mouthFill" d="M68 100 Q80 106 92 100" fill="transparent" stroke="none"/>
+
+                    <!-- Ears -->
+                    <ellipse cx="42" cy="80" rx="5" ry="8" fill="url(#skinGrad)"/>
+                    <ellipse cx="118" cy="80" rx="5" ry="8" fill="url(#skinGrad)"/>
+                </svg>
+            </div>
+            <div class="sound-wave"></div>
+            <div class="sound-wave"></div>
+            <div class="sound-wave"></div>
+        </div>
+
+        <button id="micBtn" onclick="toggleRecording()">🎤</button>
+        <div id="status">Click to start talking</div>
+        <div id="transcript"></div>
+    </div>
+    <script>
+        const WS_URL = 'wss://bisai-alb.demoaws.com/voice';
+        let ws, audioCtx, mediaStream, isRecording = false;
+        let playbackCtx, nextPlayTime = 0;
+        const pendingBuffers = [];
+        let isAssistantSpeaking = false;
+        let mouthAnimFrame = null;
+
+        const mouth = document.getElementById('mouth');
+        const mouthFill = document.getElementById('mouthFill');
+        const avatarWrapper = document.getElementById('avatarWrapper');
+
+        function updateAvatar() {
+            avatarWrapper.classList.remove('speaking', 'listening');
+            if (isAssistantSpeaking) avatarWrapper.classList.add('speaking');
+            else if (isRecording) avatarWrapper.classList.add('listening');
+        }
+
+        // Audio-reactive mouth animation
+        let analyser, analyserData;
+        function setupAnalyser() {
+            if (!playbackCtx || analyser) return;
+            analyser = playbackCtx.createAnalyser();
+            analyser.fftSize = 256;
+            analyserData = new Uint8Array(analyser.frequencyBinCount);
+        }
+
+        function animateMouth() {
+            if (!analyser || !isAssistantSpeaking) {
+                mouth.setAttribute('d', 'M68 100 Q80 106 92 100');
+                mouthFill.setAttribute('d', 'M68 100 Q80 106 92 100');
+                mouthFill.setAttribute('fill', 'transparent');
+                return;
+            }
+            analyser.getByteFrequencyData(analyserData);
+            let sum = 0;
+            for (let i = 0; i < 20; i++) sum += analyserData[i];
+            const avg = sum / 20;
+            const openness = Math.min(avg / 180, 1);
+
+            const yOpen = 100 + openness * 12;
+            const cpY = 100 + openness * 6;
+            mouth.setAttribute('d', `M68 100 Q80 ${cpY} 92 100 Q80 ${yOpen} 68 100`);
+            mouthFill.setAttribute('d', `M68 100 Q80 ${cpY} 92 100 Q80 ${yOpen} 68 100`);
+            mouthFill.setAttribute('fill', openness > 0.15 ? '#8b1a1a' : 'transparent');
+
+            mouthAnimFrame = requestAnimationFrame(animateMouth);
+        }
+
+        function startMouthAnim() {
+            setupAnalyser();
+            if (mouthAnimFrame) cancelAnimationFrame(mouthAnimFrame);
+            animateMouth();
+        }
+        function stopMouthAnim() {
+            if (mouthAnimFrame) { cancelAnimationFrame(mouthAnimFrame); mouthAnimFrame = null; }
+            mouth.setAttribute('d', 'M68 100 Q80 106 92 100');
+            mouthFill.setAttribute('d', 'M68 100 Q80 106 92 100');
+            mouthFill.setAttribute('fill', 'transparent');
+        }
+
+        async function toggleRecording() {
+            if (isRecording) stopRecording();
+            else await startRecording();
+        }
+
+        async function startRecording() {
+            try {
+                setStatus('Connecting...');
+                ws = new WebSocket(WS_URL);
+
+                ws.onopen = async () => {
+                    setStatus('🎙️ Listening... speak anytime');
+                    audioCtx = new AudioContext({ sampleRate: 16000 });
+                    playbackCtx = new AudioContext({ sampleRate: 16000 });
+                    nextPlayTime = playbackCtx.currentTime;
+                    analyser = null;
+
+                    mediaStream = await navigator.mediaDevices.getUserMedia({
+                        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                    });
+
+                    const source = audioCtx.createMediaStreamSource(mediaStream);
+                    const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+                    processor.onaudioprocess = (e) => {
+                        if (ws?.readyState === WebSocket.OPEN) {
+                            const pcm = e.inputBuffer.getChannelData(0);
+                            const int16 = new Int16Array(pcm.length);
+                            for (let i = 0; i < pcm.length; i++) int16[i] = Math.max(-32768, Math.min(32767, pcm[i] * 32768));
+                            ws.send(JSON.stringify({ type: 'audio', data: arrayBufferToBase64(int16.buffer) }));
+                        }
+                    };
+                    source.connect(processor);
+                    processor.connect(audioCtx.destination);
+
+                    isRecording = true;
+                    updateMicButton();
+                    updateAvatar();
+                };
+
+                ws.onmessage = (e) => {
+                    const msg = JSON.parse(e.data);
+                    if (msg.type === 'audio') {
+                        scheduleAudio(msg.data);
+                        if (!isAssistantSpeaking) {
+                            isAssistantSpeaking = true;
+                            updateMicButton();
+                            updateAvatar();
+                            startMouthAnim();
+                            setStatus('🔊 Assistant speaking... (interrupt anytime)');
+                        }
+                    } else if (msg.type === 'transcript') {
+                        updateTranscript(msg.role, msg.text, msg.is_final);
+                    } else if (msg.type === 'interruption') {
+                        clearAudioQueue();
+                        isAssistantSpeaking = false;
+                        updateMicButton();
+                        updateAvatar();
+                        stopMouthAnim();
+                        setStatus('🎙️ Listening...');
+                        addSystemMessage('⚡ Interrupted');
+                    } else if (msg.type === 'response_end') {
+                        isAssistantSpeaking = false;
+                        updateMicButton();
+                        updateAvatar();
+                        stopMouthAnim();
+                        setStatus('🎙️ Listening... speak anytime');
+                    } else if (msg.type === 'error') {
+                        setStatus('❌ ' + msg.message);
+                    }
+                };
+
+                ws.onclose = () => { stopRecording(); setStatus('Disconnected - click to reconnect'); };
+                ws.onerror = () => { stopRecording(); setStatus('Connection error'); };
+            } catch (err) { setStatus('Error: ' + err.message); }
+        }
+
+        function stopRecording() {
+            if (ws?.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({ type: 'stop' })); ws.close(); }
+            if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+            if (audioCtx) audioCtx.close().catch(() => {});
+            if (playbackCtx) playbackCtx.close().catch(() => {});
+            clearAudioQueue();
+            stopMouthAnim();
+            isRecording = false;
+            isAssistantSpeaking = false;
+            analyser = null;
+            updateMicButton();
+            updateAvatar();
+            setStatus('Click to start talking');
+        }
+
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+
+        function base64ToInt16Array(b64) {
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return new Int16Array(bytes.buffer);
+        }
+
+        function scheduleAudio(b64) {
+            if (!playbackCtx) return;
+            setupAnalyser();
+            const int16 = base64ToInt16Array(b64);
+            const float32 = new Float32Array(int16.length);
+            for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768;
+            const buffer = playbackCtx.createBuffer(1, float32.length, 16000);
+            buffer.copyToChannel(float32, 0);
+            const source = playbackCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(analyser);
+            analyser.connect(playbackCtx.destination);
+            const now = playbackCtx.currentTime;
+            if (nextPlayTime < now) nextPlayTime = now;
+            source.start(nextPlayTime);
+            pendingBuffers.push(source);
+            nextPlayTime += buffer.duration;
+            source.onended = () => { const idx = pendingBuffers.indexOf(source); if (idx > -1) pendingBuffers.splice(idx, 1); };
+        }
+
+        function clearAudioQueue() {
+            pendingBuffers.forEach(src => { try { src.stop(); } catch (e) {} });
+            pendingBuffers.length = 0;
+            if (playbackCtx) nextPlayTime = playbackCtx.currentTime;
+        }
+
+        let currentPreview = null;
+        function updateTranscript(role, text, isFinal) {
+            const div = document.getElementById('transcript');
+            if (!isFinal) {
+                if (!currentPreview || currentPreview.dataset.role !== role) {
+                    currentPreview = document.createElement('div');
+                    currentPreview.className = 'msg ' + role + ' preview';
+                    currentPreview.dataset.role = role;
+                    div.appendChild(currentPreview);
+                }
+                currentPreview.textContent = (role === 'user' ? '👤 ' : '🤖 ') + text + '...';
+            } else {
+                if (currentPreview && currentPreview.dataset.role === role) {
+                    currentPreview.classList.remove('preview');
+                    currentPreview.textContent = (role === 'user' ? '👤 ' : '🤖 ') + text;
+                    currentPreview = null;
+                } else {
+                    const p = document.createElement('div');
+                    p.className = 'msg ' + role;
+                    p.textContent = (role === 'user' ? '👤 ' : '🤖 ') + text;
+                    div.appendChild(p);
+                }
+            }
+            div.scrollTop = div.scrollHeight;
+        }
+
+        function addSystemMessage(text) {
+            const div = document.getElementById('transcript');
+            const p = document.createElement('div');
+            p.className = 'msg system';
+            p.textContent = text;
+            div.appendChild(p);
+            div.scrollTop = div.scrollHeight;
+        }
+
+        function updateMicButton() {
+            const btn = document.getElementById('micBtn');
+            btn.classList.remove('recording');
+            if (!isRecording) btn.textContent = '🎤';
+            else { btn.classList.add('recording'); btn.textContent = '🎙️'; }
+        }
+
+        function setStatus(s) { document.getElementById('status').textContent = s; }
+    </script>
+</body>
+</html>
