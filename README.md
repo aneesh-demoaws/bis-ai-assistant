@@ -1,4 +1,6 @@
-# BIS AI Assistant 🎓
+# BIS AI Assistant
+
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE) 🎓
 
 An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** featuring:
 - 🎤 Real-time voice conversations using Amazon Nova 2 Sonic
