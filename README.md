@@ -1,7 +1,8 @@
 # BIS AI Assistant
 
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0-brightgreen)](https://github.com/aneesh-demoaws/bis-ai-assistant) 🎓
+[![Version](https://img.shields.io/badge/Version-1.0-brightgreen)](https://github.com/aneesh-demoaws/bis-ai-assistant)
+[![Bedrock](https://img.shields.io/badge/Amazon-Bedrock-orange)](https://aws.amazon.com/bedrock/) 🎓
 
 An educational AI-powered assistant for **Bhavans Indian School (BIS) Bahrain** featuring:
 - 🎤 Real-time voice conversations using Amazon Nova 2 Sonic
