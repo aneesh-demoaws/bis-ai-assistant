@@ -44,7 +44,8 @@ async def voice_chat(websocket: WebSocket):
         model_id="amazon.nova-2-sonic-v1:0",
         provider_config={
             "audio": {"voice": "arjun"},
-            "inference": {"max_tokens": 8192, "temperature": 0.7, "top_p": 0.9}
+            "inference": {"max_tokens": 8192, "temperature": 0.7, "top_p": 0.9},
+            "turn_detection": {"endpointingSensitivity": "HIGH"}
         },
         client_config={"region": "eu-north-1"}
     )
